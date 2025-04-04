@@ -1,0 +1,13 @@
+name: "Maestro Action"
+description: "Runs Maestro"
+inputs:
+  formula:
+    description: "Maestro Formula"
+    required: true
+  applications:
+    description: "List of application names"
+    required: true
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

@@ -1,0 +1,15 @@
+{
+    "name": "maestro-action",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "ncc build src/main.ts -o dist"
+    },
+    "dependencies": {
+        "@actions/core": "^1.10.0"
+    },
+    "devDependencies": {
+        "@vercel/ncc": "^0.38.3",
+        "typescript": "^5.0.0"
+    }
+}
