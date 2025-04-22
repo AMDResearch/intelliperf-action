@@ -25696,6 +25696,7 @@ async function run() {
         core.info("Applications:");
         for (const app of apps) {
             core.info(`- Command: ${app.command}`);
+            core.info(`- Output File: ${app.output_json}`);
             if (app.build_script) {
                 core.info(`  Build Script: ${app.build_script}`);
             }
