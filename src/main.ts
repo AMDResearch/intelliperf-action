@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 
 type Application = {
     command: string;
+    output_json: string;
     build_script?: string;
 };
 
@@ -21,6 +22,7 @@ async function run() {
 
         for (const app of apps) {
             core.info(`- Command: ${app.command}`);
+            core.info(`- Output File: ${app.output_json}`);
             if (app.build_script) {
                 core.info(`  Build Script: ${app.build_script}`);
             }
