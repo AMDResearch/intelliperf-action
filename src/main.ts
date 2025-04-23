@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 type Application = {
     command: string;
@@ -28,15 +29,16 @@ async function run() {
                 core.info(`- Output File: ${app.output_json}`);
             }
 
-            if (app.apptainer_image) {
-                core.info(`- Apptainer Image: ${app.apptainer_image}`);
-                if (fs.existsSync(app.apptainer_image)) {
-                    core.info(`  ✅ Found Apptainer image at ${app.apptainer_image}`);
-                } else {
-                    core.warning(`  ⚠️ Apptainer image not found at ${app.apptainer_image}`);
-                }
+            // Apptainer image (use default if not provided)
+            const image = app.apptainer_image || 'apptainer/maestro.sif';
+            core.info(`- Apptainer Image: ${image}`);
+            if (fs.existsSync(image)) {
+                core.info(`  ✅ Found Apptainer image at ${image}`);
+            } else {
+                core.warning(`  ⚠️ Apptainer image not found at ${image}`);
             }
 
+            // Build script (optional)
             if (app.build_script) {
                 core.info(`- Build Script: ${app.build_script}`);
                 if (fs.existsSync(app.build_script)) {
@@ -45,6 +47,26 @@ async function run() {
                     core.warning(`  ⚠️ Build script not found at ${app.build_script}`);
                 }
             }
+
+            // Create overlay image
+            const user = process.env.USER || 'github';
+            const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
+            const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
+            const overlaySize = 2048;
+
+            if (!fs.existsSync(overlay)) {
+                core.info(`[Log] Creating overlay: ${overlay}`);
+                execSync(`apptainer overlay create --size ${overlaySize} --create-dir /var/cache/maestro ${overlay}`, { stdio: 'inherit' });
+            } else {
+                core.info(`[Log] Overlay already exists: ${overlay}`);
+            }
+
+            // Run the command in Apptainer container
+            const outputFlag = app.output_json ? `--output_file ${app.output_json}` : '';
+            const cmd = `apptainer exec --overlay ${overlay} --cleanenv ${image} bash --rcfile /etc/bash.bashrc -c "maestro ${outputFlag} -- ${app.command}"`;
+
+            core.info(`[Log] Executing: ${cmd}`);
+            execSync(cmd, { stdio: 'inherit' });
         }
     } catch (err: any) {
         core.setFailed(`Failed to run action: ${err.message}`);
