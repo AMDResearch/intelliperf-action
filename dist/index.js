@@ -25683,6 +25683,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
+const fs = __importStar(__nccwpck_require__(9896));
 async function run() {
     try {
         const formula = core.getInput("formula");
@@ -25696,10 +25697,26 @@ async function run() {
         core.info("Applications:");
         for (const app of apps) {
             core.info(`- Command: ${app.command}`);
-            core.info(`- Output File: ${app.output_json}`);
+            if (app.output_json) {
+                core.info(`- Output File: ${app.output_json}`);
+            }
+            if (app.apptainer_image) {
+                core.info(`- Apptainer Image: ${app.apptainer_image}`);
+                if (fs.existsSync(app.apptainer_image)) {
+                    core.info(`  ✅ Found Apptainer image at ${app.apptainer_image}`);
+                }
+                else {
+                    core.warning(`  ⚠️ Apptainer image not found at ${app.apptainer_image}`);
+                }
+            }
             if (app.build_script) {
-                core.info(`  Build Script: ${app.build_script}`);
-                core.info(`  Build Script: ${app.apptainer_image}`);
+                core.info(`- Build Script: ${app.build_script}`);
+                if (fs.existsSync(app.build_script)) {
+                    core.info(`  ✅ Found build script at ${app.build_script}`);
+                }
+                else {
+                    core.warning(`  ⚠️ Build script not found at ${app.build_script}`);
+                }
             }
         }
     }
