@@ -25699,6 +25699,7 @@ async function run() {
             core.info(`- Output File: ${app.output_json}`);
             if (app.build_script) {
                 core.info(`  Build Script: ${app.build_script}`);
+                core.info(`  Build Script: ${app.apptainer_image}`);
             }
         }
     }
