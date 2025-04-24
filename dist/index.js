@@ -25684,7 +25684,13 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
+const path = __importStar(__nccwpck_require__(6928));
 const child_process_1 = __nccwpck_require__(5317);
+const fs_1 = __nccwpck_require__(9896);
+const os = __importStar(__nccwpck_require__(857));
+function abs(p) {
+    return path.isAbsolute(p) ? p : path.resolve(p);
+}
 async function run() {
     try {
         const formula = core.getInput("formula");
@@ -25697,30 +25703,31 @@ async function run() {
         core.info(`Formula: ${formula}`);
         core.info("Applications:");
         for (const app of apps) {
-            core.info(`- Command: ${app.command}`);
-            if (app.output_json) {
-                core.info(`- Output File: ${app.output_json}`);
+            // Resolve absolute paths
+            const absCommand = abs(app.command);
+            const absOutputJson = app.output_json ? abs(app.output_json) : undefined;
+            const absBuildScript = app.build_script ? abs(app.build_script) : undefined;
+            const absImage = abs(app.apptainer_image || 'apptainer/maestro.sif');
+            core.info(`- Command: ${absCommand}`);
+            if (absOutputJson) {
+                core.info(`- Output File: ${absOutputJson}`);
             }
-            // Apptainer image (use default if not provided)
-            const image = app.apptainer_image || 'apptainer/maestro.sif';
-            core.info(`- Apptainer Image: ${image}`);
-            if (fs.existsSync(image)) {
-                core.info(`  ✅ Found Apptainer image at ${image}`);
+            core.info(`- Apptainer Image: ${absImage}`);
+            if (fs.existsSync(absImage)) {
+                core.info(`  ✅ Found Apptainer image at ${absImage}`);
             }
             else {
-                core.warning(`  ⚠️ Apptainer image not found at ${image}`);
+                core.warning(`  ⚠️ Apptainer image not found at ${absImage}`);
             }
-            // Build script (optional)
-            if (app.build_script) {
-                core.info(`- Build Script: ${app.build_script}`);
-                if (fs.existsSync(app.build_script)) {
-                    core.info(`  ✅ Found build script at ${app.build_script}`);
+            if (absBuildScript) {
+                core.info(`- Build Script: ${absBuildScript}`);
+                if (fs.existsSync(absBuildScript)) {
+                    core.info(`  ✅ Found build script at ${absBuildScript}`);
                 }
                 else {
-                    core.warning(`  ⚠️ Build script not found at ${app.build_script}`);
+                    core.warning(`  ⚠️ Build script not found at ${absBuildScript}`);
                 }
             }
-            // Create overlay image
             const user = process.env.USER || 'github';
             const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
             const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
@@ -25732,11 +25739,25 @@ async function run() {
             else {
                 core.info(`[Log] Overlay already exists: ${overlay}`);
             }
-            // Run the command in Apptainer container
-            const outputFlag = app.output_json ? `--output_file ${app.output_json}` : '';
-            const cmd = `apptainer exec --overlay ${overlay} --cleanenv ${image} bash --rcfile /etc/bash.bashrc -c "maestro ${outputFlag} -- ${app.command}"`;
-            core.info(`[Log] Executing: ${cmd}`);
-            (0, child_process_1.execSync)(cmd, { stdio: 'inherit' });
+            const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
+            const maestroCmd = `maestro -vvv ${outputFlag} -- ${absCommand}`;
+            const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${absImage} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
+            // Create a temp dir and run inside it
+            const tempDir = (0, fs_1.mkdtempSync)(path.join(os.tmpdir(), 'maestro_exec_'));
+            core.info(`[Log] Created temp dir: ${tempDir}`);
+            core.info(`[Log] Executing in temp dir: ${apptainerCmd}`);
+            try {
+                (0, child_process_1.execSync)(apptainerCmd, { cwd: tempDir, stdio: 'inherit' });
+            }
+            catch (error) {
+                if (error instanceof Error) {
+                    core.warning(`::warning::Failed to run command: ${apptainerCmd}`);
+                    core.warning(`::warning::Error message: ${error.message}`);
+                }
+                else {
+                    core.warning(`::warning::Unknown error while running: ${apptainerCmd}`);
+                }
+            }
         }
     }
     catch (err) {
