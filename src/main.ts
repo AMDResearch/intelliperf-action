@@ -32,7 +32,7 @@ async function run() {
 
         for (const app of apps) {
             // Resolve absolute paths
-            const command = abs(app.command);
+            const command = app.command;
             const absOutputJson = app.output_json ? abs(app.output_json) : undefined;
             const absBuildScript = app.build_script ? abs(app.build_script) : undefined;
             const absImage = abs(app.apptainer_image || 'apptainer/maestro.sif');
