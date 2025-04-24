@@ -25704,11 +25704,11 @@ async function run() {
         core.info("Applications:");
         for (const app of apps) {
             // Resolve absolute paths
-            const absCommand = abs(app.command);
+            const command = abs(app.command);
             const absOutputJson = app.output_json ? abs(app.output_json) : undefined;
             const absBuildScript = app.build_script ? abs(app.build_script) : undefined;
             const absImage = abs(app.apptainer_image || 'apptainer/maestro.sif');
-            core.info(`- Command: ${absCommand}`);
+            core.info(`- Command: ${command}`);
             if (absOutputJson) {
                 core.info(`- Output File: ${absOutputJson}`);
             }
@@ -25740,7 +25740,7 @@ async function run() {
                 core.info(`[Log] Overlay already exists: ${overlay}`);
             }
             const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
-            const maestroCmd = `maestro -vvv ${outputFlag} -- ${absCommand}`;
+            const maestroCmd = `maestro -vvv ${outputFlag} -- ${command}`;
             const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${absImage} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
             // Create a temp dir and run inside it
             const tempDir = (0, fs_1.mkdtempSync)(path.join(os.tmpdir(), 'maestro_exec_'));
