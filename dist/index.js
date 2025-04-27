@@ -25686,10 +25686,14 @@ const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
 const path = __importStar(__nccwpck_require__(6928));
 const child_process_1 = __nccwpck_require__(5317);
-const fs_1 = __nccwpck_require__(9896);
-const os = __importStar(__nccwpck_require__(857));
 function abs(p) {
     return path.isAbsolute(p) ? p : path.resolve(p);
+}
+function formatDate(date) {
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}${dd}${yyyy}`;
 }
 async function run() {
     try {
@@ -25729,6 +25733,20 @@ async function run() {
                 }
             }
             const user = process.env.USER || 'github';
+            const jobId = process.env.GITHUB_JOB || 'localjob';
+            const today = new Date();
+            const dateStr = formatDate(today);
+            // Construct output directory: go up one level from workspace
+            const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
+            const parentDir = path.resolve(workspace, '..');
+            const execDir = path.join(parentDir, `maestro_exec_${dateStr}_${jobId}`);
+            if (!fs.existsSync(execDir)) {
+                fs.mkdirSync(execDir, { recursive: true });
+                core.info(`[Log] Created execution directory: ${execDir}`);
+            }
+            else {
+                core.info(`[Log] Execution directory already exists: ${execDir}`);
+            }
             const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
             const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
             const overlaySize = 2048;
@@ -25742,12 +25760,9 @@ async function run() {
             const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
             const maestroCmd = `maestro -vvv ${outputFlag} -- ${command}`;
             const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${absImage} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
-            // Create a temp dir and run inside it
-            const tempDir = (0, fs_1.mkdtempSync)(path.join(os.tmpdir(), 'maestro_exec_'));
-            core.info(`[Log] Created temp dir: ${tempDir}`);
-            core.info(`[Log] Executing in temp dir: ${apptainerCmd}`);
+            core.info(`[Log] Executing in directory: ${execDir}`);
             try {
-                (0, child_process_1.execSync)(apptainerCmd, { cwd: tempDir, stdio: 'inherit' });
+                (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
             }
             catch (error) {
                 if (error instanceof Error) {
