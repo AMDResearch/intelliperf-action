@@ -2,7 +2,6 @@ import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { mkdtempSync } from 'fs';
 import * as os from 'os';
 
 type Application = {
@@ -14,6 +13,13 @@ type Application = {
 
 function abs(p: string): string {
     return path.isAbsolute(p) ? p : path.resolve(p);
+}
+
+function formatDate(date: Date): string {
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}${dd}${yyyy}`;
 }
 
 async function run() {
@@ -41,7 +47,6 @@ async function run() {
             if (absOutputJson) {
                 core.info(`- Output File: ${absOutputJson}`);
             }
-
             core.info(`- Apptainer Image: ${absImage}`);
             if (fs.existsSync(absImage)) {
                 core.info(`  ✅ Found Apptainer image at ${absImage}`);
@@ -59,6 +64,22 @@ async function run() {
             }
 
             const user = process.env.USER || 'github';
+            const jobId = process.env.GITHUB_JOB || 'localjob';
+            const today = new Date();
+            const dateStr = formatDate(today);
+
+            // Construct output directory: go up one level from workspace
+            const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
+            const parentDir = path.resolve(workspace, '..');
+            const execDir = path.join(parentDir, `maestro_exec_${dateStr}_${jobId}`);
+
+            if (!fs.existsSync(execDir)) {
+                fs.mkdirSync(execDir, { recursive: true });
+                core.info(`[Log] Created execution directory: ${execDir}`);
+            } else {
+                core.info(`[Log] Execution directory already exists: ${execDir}`);
+            }
+
             const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
             const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
             const overlaySize = 2048;
@@ -74,13 +95,9 @@ async function run() {
             const maestroCmd = `maestro -vvv ${outputFlag} -- ${command}`;
             const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${absImage} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
 
-            // Create a temp dir and run inside it
-            const tempDir = mkdtempSync(path.join(os.tmpdir(), 'maestro_exec_'));
-            core.info(`[Log] Created temp dir: ${tempDir}`);
-
-            core.info(`[Log] Executing in temp dir: ${apptainerCmd}`);
+            core.info(`[Log] Executing in directory: ${execDir}`);
             try {
-                execSync(apptainerCmd, { cwd: tempDir, stdio: 'inherit' });
+                execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
             } catch (error) {
                 if (error instanceof Error) {
                     core.warning(`::warning::Failed to run command: ${apptainerCmd}`);
