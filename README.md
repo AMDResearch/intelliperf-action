@@ -25,7 +25,7 @@ jobs:
       - name: Checkout main repo
         uses: actions/checkout@v3
 
-      - name: Checkout maestro-action action
+      - name: Checkout maestro-action
         uses: actions/checkout@v3
         with:
           repository: AARInternal/maestro-action
@@ -36,11 +36,15 @@ jobs:
         uses: ./.github/actions/maestro-action
         with:
           formula: "diagnoseOnly"
+          docker_image: "my-default-docker:latest"         # Optional if using Docker
+          apptainer_image: "/path/to/default_apptainer.sif" # Optional if using Apptainer
+          top_n: "10"                                       # Optional, defaults to 10
           applications: >-
             [
-              { "command": "python app1.py", "build_script": "./build.sh" },
-              { "command": "python app2.py" }
+              { "command": "python app1.py", "build_script": "./build.sh", "output_json": "output1.json" },
+              { "command": "python app2.py", "output_json": "output2.json" }
             ]
+
 ```
 
 
