@@ -25723,7 +25723,15 @@ function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN) {
 }
 function run_in_docker(execDir, image, app, absOutputJson, topN) {
     const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
-    const dockerCmd = `docker run --rm -v ${execDir}:${execDir} -w ${execDir} ${image} bash -c "${maestroCmd}"`;
+    const homeDir = process.env.HOME;
+    const dockerCmd = `docker run --rm \
+        --device=/dev/kfd \
+        --device=/dev/dri \
+        --group-add video \
+        -v ${homeDir}:${homeDir} \
+        -w ${execDir} \
+        ${image} \
+        bash -c "${maestroCmd}"`;
     core.info(`[Log] Executing in Docker: ${dockerCmd}`);
     (0, child_process_1.execSync)(dockerCmd, { cwd: execDir, stdio: 'inherit' });
 }
