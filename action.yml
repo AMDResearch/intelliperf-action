@@ -5,9 +5,17 @@ inputs:
     description: "Maestro Formula"
     required: true
   applications:
-    description: "List of application names"
+    description: "List of application objects"
     required: true
-
+  docker_image:
+    description: "Default Docker image to use"
+    required: false
+  apptainer_image:
+    description: "Default Apptainer image to use"
+    required: false
+  top_n:
+    description: "Top N kernels to report (default: 10)"
+    required: false
 runs:
   using: "node20"
   main: "dist/index.js"
