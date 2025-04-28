@@ -57,7 +57,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
     const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME!;
 
-    const dockerCmd = `docker run --rm \
+    const dockerCmd = `docker run \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
