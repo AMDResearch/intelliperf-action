@@ -53,16 +53,14 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(image: string, app: Application, absOutputJson?: string, topN?: string) {
+function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string) {
     const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
-    const execDir = process.cwd();
     const homeDir = process.env.HOME!;
 
     const dockerCmd = `docker run --rm \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
-        -v ${execDir}:${execDir} \
         -v ${homeDir}:${homeDir} \
         -w ${execDir} \
         ${image} \
