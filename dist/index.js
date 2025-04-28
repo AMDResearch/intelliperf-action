@@ -25695,9 +25695,45 @@ function formatDate(date) {
     const yyyy = date.getFullYear();
     return `${mm}${dd}${yyyy}`;
 }
+function createOverlay() {
+    const user = process.env.USER || 'github';
+    const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
+    const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
+    const overlaySize = 2048;
+    core.info(`[Log] Creating overlay: ${overlay}`);
+    (0, child_process_1.execSync)(`apptainer overlay create --size ${overlaySize} --create-dir /var/cache/maestro ${overlay}`, { stdio: 'inherit' });
+    return overlay;
+}
+function deleteOverlay(overlayPath) {
+    if (fs.existsSync(overlayPath)) {
+        core.info(`[Log] Deleting overlay: ${overlayPath}`);
+        fs.unlinkSync(overlayPath);
+    }
+}
+function buildMaestroCommand(app, absOutputJson, topN) {
+    const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
+    const topNFlag = topN ? `--top-n ${topN}` : '';
+    return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
+}
+function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN) {
+    const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+    const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${image} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
+    core.info(`[Log] Executing in Apptainer: ${apptainerCmd}`);
+    (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
+}
+function run_in_docker(execDir, image, app, absOutputJson, topN) {
+    const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+    const dockerCmd = `docker run --rm -v ${execDir}:${execDir} -w ${execDir} ${image} bash -c "${maestroCmd}"`;
+    core.info(`[Log] Executing in Docker: ${dockerCmd}`);
+    (0, child_process_1.execSync)(dockerCmd, { cwd: execDir, stdio: 'inherit' });
+}
 async function run() {
     try {
         const formula = core.getInput("formula");
+        const rawTopN = core.getInput("top_n");
+        const topN = rawTopN !== '' ? rawTopN : '10';
+        const defaultDockerImage = core.getInput("docker_image");
+        const defaultApptainerImage = core.getInput("apptainer_image");
         if (formula !== "diagnoseOnly") {
             core.setFailed(`Invalid formula: ${formula}. Only "diagnoseOnly" is allowed.`);
             return;
@@ -25705,72 +25741,64 @@ async function run() {
         const appsJson = core.getInput("applications");
         const apps = JSON.parse(appsJson);
         core.info(`Formula: ${formula}`);
+        core.info(`Top N: ${topN}`);
+        if (defaultDockerImage) {
+            core.info(`Default Docker Image: ${defaultDockerImage}`);
+        }
+        if (defaultApptainerImage) {
+            core.info(`Default Apptainer Image: ${defaultApptainerImage}`);
+        }
         core.info("Applications:");
+        const jobId = process.env.GITHUB_JOB || 'localjob';
+        const today = new Date();
+        const dateStr = formatDate(today);
+        const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
+        const parentDir = path.resolve(workspace, '..');
+        const execDir = path.join(parentDir, `maestro_exec_${dateStr}_${jobId}`);
+        if (!fs.existsSync(execDir)) {
+            fs.mkdirSync(execDir, { recursive: true });
+            core.info(`[Log] Created execution directory: ${execDir}`);
+        }
+        else {
+            core.info(`[Log] Execution directory already exists: ${execDir}`);
+        }
         for (const app of apps) {
-            // Resolve absolute paths
-            const command = app.command;
             const absOutputJson = app.output_json ? abs(app.output_json) : undefined;
             const absBuildScript = app.build_script ? abs(app.build_script) : undefined;
-            const absImage = abs(app.apptainer_image || 'apptainer/maestro.sif');
-            core.info(`- Command: ${command}`);
-            if (absOutputJson) {
+            core.info(`- Command: ${app.command}`);
+            if (absOutputJson)
                 core.info(`- Output File: ${absOutputJson}`);
-            }
-            core.info(`- Apptainer Image: ${absImage}`);
-            if (fs.existsSync(absImage)) {
-                core.info(`  ✅ Found Apptainer image at ${absImage}`);
-            }
-            else {
-                core.warning(`  ⚠️ Apptainer image not found at ${absImage}`);
-            }
             if (absBuildScript) {
                 core.info(`- Build Script: ${absBuildScript}`);
-                if (fs.existsSync(absBuildScript)) {
-                    core.info(`  ✅ Found build script at ${absBuildScript}`);
+                if (!fs.existsSync(absBuildScript)) {
+                    core.warning(`⚠️ Build script not found at ${absBuildScript}`);
+                }
+            }
+            try {
+                if (defaultApptainerImage) {
+                    const apptainerAbsImage = abs(defaultApptainerImage);
+                    const overlay = createOverlay();
+                    try {
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN);
+                    }
+                    finally {
+                        deleteOverlay(overlay);
+                    }
+                }
+                else if (defaultDockerImage) {
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN);
                 }
                 else {
-                    core.warning(`  ⚠️ Build script not found at ${absBuildScript}`);
+                    core.warning('No available container image to run the application.');
                 }
-            }
-            const user = process.env.USER || 'github';
-            const jobId = process.env.GITHUB_JOB || 'localjob';
-            const today = new Date();
-            const dateStr = formatDate(today);
-            // Construct output directory: go up one level from workspace
-            const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
-            const parentDir = path.resolve(workspace, '..');
-            const execDir = path.join(parentDir, `maestro_exec_${dateStr}_${jobId}`);
-            if (!fs.existsSync(execDir)) {
-                fs.mkdirSync(execDir, { recursive: true });
-                core.info(`[Log] Created execution directory: ${execDir}`);
-            }
-            else {
-                core.info(`[Log] Execution directory already exists: ${execDir}`);
-            }
-            const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
-            const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
-            const overlaySize = 2048;
-            if (!fs.existsSync(overlay)) {
-                core.info(`[Log] Creating overlay: ${overlay}`);
-                (0, child_process_1.execSync)(`apptainer overlay create --size ${overlaySize} --create-dir /var/cache/maestro ${overlay}`, { stdio: 'inherit' });
-            }
-            else {
-                core.info(`[Log] Overlay already exists: ${overlay}`);
-            }
-            const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
-            const maestroCmd = `maestro -vvv ${outputFlag} -- ${command}`;
-            const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${absImage} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
-            core.info(`[Log] Executing in directory: ${execDir}`);
-            try {
-                (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
             }
             catch (error) {
                 if (error instanceof Error) {
-                    core.warning(`::warning::Failed to run command: ${apptainerCmd}`);
+                    core.warning(`::warning::Failed to run application command`);
                     core.warning(`::warning::Error message: ${error.message}`);
                 }
                 else {
-                    core.warning(`::warning::Unknown error while running: ${apptainerCmd}`);
+                    core.warning(`::warning::Unknown error occurred`);
                 }
             }
         }
