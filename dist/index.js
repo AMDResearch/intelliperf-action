@@ -25724,7 +25724,7 @@ function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN) {
 function run_in_docker(execDir, image, app, absOutputJson, topN) {
     const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME;
-    const dockerCmd = `docker run --rm \
+    const dockerCmd = `docker run \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
