@@ -53,9 +53,20 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string) {
+function run_in_docker(image: string, app: Application, absOutputJson?: string, topN?: string) {
     const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
-    const dockerCmd = `docker run --rm -v ${execDir}:${execDir} -w ${execDir} ${image} bash -c "${maestroCmd}"`;
+    const execDir = process.cwd();
+    const homeDir = process.env.HOME!;
+
+    const dockerCmd = `docker run --rm \
+        --device=/dev/kfd \
+        --device=/dev/dri \
+        --group-add video \
+        -v ${execDir}:${execDir} \
+        -v ${homeDir}:${homeDir} \
+        -w ${execDir} \
+        ${image} \
+        bash -c "${maestroCmd}"`;
 
     core.info(`[Log] Executing in Docker: ${dockerCmd}`);
     execSync(dockerCmd, { cwd: execDir, stdio: 'inherit' });
@@ -87,7 +98,7 @@ async function run() {
         }
         core.info("Applications:");
 
-        
+
         const jobId = process.env.GITHUB_JOB || 'localjob';
         const today = new Date();
         const dateStr = formatDate(today);
@@ -115,7 +126,7 @@ async function run() {
                     core.warning(`⚠️ Build script not found at ${absBuildScript}`);
                 }
             }
-            
+
 
             try {
                 if (defaultApptainerImage) {
