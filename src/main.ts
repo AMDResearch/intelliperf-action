@@ -45,18 +45,33 @@ function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: st
     return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
 
-function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string) {
-    const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+    
+    if (huggingfaceToken) {
+        maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
+    }
+
     const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${image} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
 
-    core.info(`[Log] Executing in Apptainer: ${apptainerCmd}`);
+    // Obfuscate the token after "--token"
+    let safeApptainerCmd = apptainerCmd;
+    if (huggingfaceToken) {
+        safeApptainerCmd = apptainerCmd.replace(/(--token)\s+\S+/, '$1 ********');
+    }
+
+    core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string) {
-    const maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME!;
 
+    if (huggingfaceToken) {
+        maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
+    }
+    
     const dockerCmd = `docker run \
         --device=/dev/kfd \
         --device=/dev/dri \
@@ -66,7 +81,13 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         ${image} \
         bash -c "${maestroCmd}"`;
 
-    core.info(`[Log] Executing in Docker: ${dockerCmd}`);
+    // Obfuscate the token after "--token"
+    let safeDockerCmd = dockerCmd;
+    if (huggingfaceToken) {
+        safeDockerCmd = dockerCmd.replace(/(--token)\s+\S+/, '$1 ********');
+    }
+
+    core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     execSync(dockerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
@@ -77,6 +98,7 @@ async function run() {
         const topN = rawTopN !== '' ? rawTopN : '10';
         const defaultDockerImage = core.getInput("docker_image");
         const defaultApptainerImage = core.getInput("apptainer_image");
+        const huggingfaceToken = core.getInput("huggingface_token");
 
         if (formula !== "diagnoseOnly") {
             core.setFailed(`Invalid formula: ${formula}. Only "diagnoseOnly" is allowed.`);
@@ -132,12 +154,12 @@ async function run() {
                     const overlay = createOverlay();
 
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
                     } finally {
                         deleteOverlay(overlay);
                     }
                 } else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
                 } else {
                     core.warning('No available container image to run the application.');
                 }

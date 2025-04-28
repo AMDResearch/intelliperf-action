@@ -16,6 +16,9 @@ inputs:
   top_n:
     description: "Top N kernels to report (default: 10)"
     required: false
+  huggingface_token:
+    description: "Huggingface token"
+    required: false    
 runs:
   using: "node20"
   main: "dist/index.js"
