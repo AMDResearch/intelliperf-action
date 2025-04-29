@@ -73,6 +73,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
     }
     
     const dockerCmd = `docker run \
+        --rm \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
