@@ -25736,6 +25736,7 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
     }
     const dockerCmd = `docker run \
+        --rm \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
