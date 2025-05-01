@@ -25817,7 +25817,6 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
     }
     const dockerCmd = `docker run \
         --rm \
-        --user $(id -u):$(id -g) \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
