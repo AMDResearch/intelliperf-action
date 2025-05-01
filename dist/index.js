@@ -25761,7 +25761,7 @@ function buildMaestroCommand(app, absOutputJson, topN) {
     const topNFlag = topN ? `--top-n ${topN}` : '';
     return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
-function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, huggingfaceToken) {
+function run_in_apptainer(execDir, workspace, image, app, overlay, absOutputJson, topN, huggingfaceToken) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
@@ -25775,7 +25775,7 @@ function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, hug
     core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
     (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
-function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToken) {
+function run_in_docker(execDir, workspace, image, app, absOutputJson, topN, huggingfaceToken) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME;
     if (huggingfaceToken) {
@@ -25797,6 +25797,8 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
     }
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     (0, child_process_1.execSync)(dockerCmd, { cwd: execDir, stdio: 'inherit' });
+    // Cleanup step
+    (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
 }
 async function run() {
     try {
@@ -25822,11 +25824,12 @@ async function run() {
         }
         core.info("Applications:");
         const jobId = process.env.GITHUB_JOB || 'localjob';
+        const repoName = process.env.GITHUB_REPOSITORY || 'unknown-repo';
         const today = new Date();
         const dateStr = formatDate(today);
         const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
         const parentDir = path.resolve(workspace, '..');
-        const execDir = path.join(parentDir, `maestro_exec_${dateStr}_${jobId}`);
+        const execDir = path.join(parentDir, `maestro_exec_${repoName}_${dateStr}_${jobId}`);
         if (!fs.existsSync(execDir)) {
             fs.mkdirSync(execDir, { recursive: true });
             core.info(`[Log] Created execution directory: ${execDir}`);
@@ -25851,14 +25854,14 @@ async function run() {
                     const apptainerAbsImage = abs(defaultApptainerImage);
                     const overlay = createOverlay();
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
+                        run_in_apptainer(execDir, workspace, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
                     }
                     finally {
                         deleteOverlay(overlay);
                     }
                 }
                 else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
+                    run_in_docker(execDir, workspace, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
                 }
                 else {
                     core.warning('No available container image to run the application.');
