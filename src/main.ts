@@ -69,9 +69,9 @@ function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: st
     return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
 
-function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
+function run_in_apptainer(execDir: string, workspace: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
-    
+
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
     }
@@ -88,14 +88,14 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
+function run_in_docker(execDir: string, workspace: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME!;
 
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
     }
-    
+
     const dockerCmd = `docker run \
         --rm \
         --device=/dev/kfd \
@@ -114,6 +114,9 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
 
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     execSync(dockerCmd, { cwd: execDir, stdio: 'inherit' });
+
+    // Cleanup step
+    execSync(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
 }
 
 async function run() {
@@ -145,12 +148,13 @@ async function run() {
 
 
         const jobId = process.env.GITHUB_JOB || 'localjob';
+        const repoName = process.env.GITHUB_REPOSITORY || 'unknown-repo';
         const today = new Date();
         const dateStr = formatDate(today);
 
         const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
         const parentDir = path.resolve(workspace, '..');
-        const execDir = path.join(parentDir, `maestro_exec_${dateStr}_${jobId}`);
+        const execDir = path.join(parentDir, `maestro_exec_${repoName}_${dateStr}_${jobId}`);
 
         if (!fs.existsSync(execDir)) {
             fs.mkdirSync(execDir, { recursive: true });
@@ -179,12 +183,12 @@ async function run() {
                     const overlay = createOverlay();
 
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
+                        run_in_apptainer(execDir, workspace, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
                     } finally {
                         deleteOverlay(overlay);
                     }
                 } else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
+                    run_in_docker(execDir, workspace, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
                 } else {
                     core.warning('No available container image to run the application.');
                 }
