@@ -25842,7 +25842,8 @@ async function run() {
         }
         core.info("Applications:");
         const jobId = process.env.GITHUB_JOB || 'localjob';
-        const repoName = process.env.GITHUB_REPOSITORY || 'unknown-repo';
+        const fullRepo = process.env.GITHUB_REPOSITORY || 'unknown-repo';
+        const repoName = fullRepo.split('/').pop() || 'unknown-repo';
         const today = new Date();
         const dateStr = formatDate(today);
         const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
