@@ -25761,7 +25761,28 @@ function buildMaestroCommand(app, absOutputJson, topN) {
     const topNFlag = topN ? `--top-n ${topN}` : '';
     return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
-function run_in_apptainer(execDir, workspace, image, app, overlay, absOutputJson, topN, huggingfaceToken) {
+function do_cleanup(workspace) {
+    core.info(`[Log] Starting cleanup of __pycache__ directories in: ${workspace}`);
+    try {
+        const findCmd = `find . -type d -name "__pycache__"`;
+        const filesToRemove = (0, child_process_1.execSync)(findCmd, { cwd: workspace }).toString().trim();
+        if (filesToRemove) {
+            core.info(`[Log] Found __pycache__ directories to remove:`);
+            filesToRemove.split('\n').forEach(dir => {
+                core.info(`[Log] - ${dir}`);
+            });
+            (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
+            core.info(`[Log] Cleanup completed successfully`);
+        }
+        else {
+            core.info(`[Log] No __pycache__ directories found to clean`);
+        }
+    }
+    catch (error) {
+        core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, huggingfaceToken) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
@@ -25775,7 +25796,7 @@ function run_in_apptainer(execDir, workspace, image, app, overlay, absOutputJson
     core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
     (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
-function run_in_docker(execDir, workspace, image, app, absOutputJson, topN, huggingfaceToken) {
+function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToken) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME;
     if (huggingfaceToken) {
@@ -25797,26 +25818,6 @@ function run_in_docker(execDir, workspace, image, app, absOutputJson, topN, hugg
     }
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     (0, child_process_1.execSync)(dockerCmd, { cwd: execDir, stdio: 'inherit' });
-    // Cleanup step
-    core.info(`[Log] Starting cleanup of __pycache__ directories in: ${workspace}`);
-    try {
-        const findCmd = `find . -type d -name "__pycache__"`;
-        const filesToRemove = (0, child_process_1.execSync)(findCmd, { cwd: workspace }).toString().trim();
-        if (filesToRemove) {
-            core.info(`[Log] Found __pycache__ directories to remove:`);
-            filesToRemove.split('\n').forEach(dir => {
-                core.info(`[Log] - ${dir}`);
-            });
-            (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
-            core.info(`[Log] Cleanup completed successfully`);
-        }
-        else {
-            core.info(`[Log] No __pycache__ directories found to clean`);
-        }
-    }
-    catch (error) {
-        core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
 }
 async function run() {
     try {
@@ -25873,14 +25874,14 @@ async function run() {
                     const apptainerAbsImage = abs(defaultApptainerImage);
                     const overlay = createOverlay();
                     try {
-                        run_in_apptainer(execDir, workspace, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
                     }
                     finally {
                         deleteOverlay(overlay);
                     }
                 }
                 else if (defaultDockerImage) {
-                    run_in_docker(execDir, workspace, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
                 }
                 else {
                     core.warning('No available container image to run the application.');
@@ -25895,6 +25896,7 @@ async function run() {
                     core.warning(`::warning::Unknown error occurred`);
                 }
             }
+            do_cleanup(workspace);
         }
     }
     catch (err) {
