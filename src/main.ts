@@ -69,27 +69,40 @@ function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: st
     return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
 
-
-function do_cleanup(workspace: string) {
+function do_cleanup(workspace: string, dockerImage?: string) {
     core.info(`[Log] Starting cleanup of __pycache__ directories in: ${workspace}`);
     try {
-        const findCmd = `find . -type d -name "__pycache__"`;
-        const filesToRemove = execSync(findCmd, { cwd: workspace }).toString().trim();
+        if (dockerImage) {
+            const homeDir = process.env.HOME!;
+            const dockerCmd = `docker run \
+                --rm \
+                -v ${homeDir}:${homeDir} \
+                -w ${workspace} \
+                ${dockerImage} \
+                bash -c "find . -type d -name '__pycache__' -exec rm -rf {} +"`;
 
-        if (filesToRemove) {
-            core.info(`[Log] Found __pycache__ directories to remove:`);
-            filesToRemove.split('\n').forEach(dir => {
-                core.info(`[Log] - ${dir}`);
-            });
-            execSync(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
-            core.info(`[Log] Cleanup completed successfully`);
+            core.info(`[Log] Running cleanup inside Docker container`);
+            execSync(dockerCmd, { stdio: 'inherit' });
         } else {
-            core.info(`[Log] No __pycache__ directories found to clean`);
+            const findCmd = `find . -type d -name "__pycache__"`;
+            const filesToRemove = execSync(findCmd, { cwd: workspace }).toString().trim();
+
+            if (filesToRemove) {
+                core.info(`[Log] Found __pycache__ directories to remove:`);
+                filesToRemove.split('\n').forEach(dir => {
+                    core.info(`[Log] - ${dir}`);
+                });
+                execSync(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
+            } else {
+                core.info(`[Log] No __pycache__ directories found to clean`);
+            }
         }
+        core.info(`[Log] Cleanup completed successfully`);
     } catch (error) {
         core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
+
 function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
 
@@ -119,6 +132,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
 
     const dockerCmd = `docker run \
         --rm \
+        --user $(id -u):$(id -g) \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
@@ -135,7 +149,6 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
 
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     execSync(dockerCmd, { cwd: execDir, stdio: 'inherit' });
-
 }
 
 async function run() {
@@ -164,7 +177,6 @@ async function run() {
             core.info(`Default Apptainer Image: ${defaultApptainerImage}`);
         }
         core.info("Applications:");
-
 
         const jobId = process.env.GITHUB_JOB || 'localjob';
         const fullRepo = process.env.GITHUB_REPOSITORY || 'unknown-repo';
@@ -196,7 +208,6 @@ async function run() {
                 }
             }
 
-
             try {
                 if (defaultApptainerImage) {
                     const apptainerAbsImage = abs(defaultApptainerImage);
@@ -221,7 +232,7 @@ async function run() {
                 }
             }
 
-            do_cleanup(workspace);
+            do_cleanup(workspace, defaultDockerImage);
         }
     } catch (err: any) {
         core.setFailed(`Failed to run action: ${err.message}`);
