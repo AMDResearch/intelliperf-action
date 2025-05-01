@@ -25761,22 +25761,35 @@ function buildMaestroCommand(app, absOutputJson, topN) {
     const topNFlag = topN ? `--top-n ${topN}` : '';
     return `maestro -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
-function do_cleanup(workspace) {
+function do_cleanup(workspace, dockerImage) {
     core.info(`[Log] Starting cleanup of __pycache__ directories in: ${workspace}`);
     try {
-        const findCmd = `find . -type d -name "__pycache__"`;
-        const filesToRemove = (0, child_process_1.execSync)(findCmd, { cwd: workspace }).toString().trim();
-        if (filesToRemove) {
-            core.info(`[Log] Found __pycache__ directories to remove:`);
-            filesToRemove.split('\n').forEach(dir => {
-                core.info(`[Log] - ${dir}`);
-            });
-            (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
-            core.info(`[Log] Cleanup completed successfully`);
+        if (dockerImage) {
+            const homeDir = process.env.HOME;
+            const dockerCmd = `docker run \
+                --rm \
+                -v ${homeDir}:${homeDir} \
+                -w ${workspace} \
+                ${dockerImage} \
+                bash -c "find . -type d -name '__pycache__' -exec rm -rf {} +"`;
+            core.info(`[Log] Running cleanup inside Docker container`);
+            (0, child_process_1.execSync)(dockerCmd, { stdio: 'inherit' });
         }
         else {
-            core.info(`[Log] No __pycache__ directories found to clean`);
+            const findCmd = `find . -type d -name "__pycache__"`;
+            const filesToRemove = (0, child_process_1.execSync)(findCmd, { cwd: workspace }).toString().trim();
+            if (filesToRemove) {
+                core.info(`[Log] Found __pycache__ directories to remove:`);
+                filesToRemove.split('\n').forEach(dir => {
+                    core.info(`[Log] - ${dir}`);
+                });
+                (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
+            }
+            else {
+                core.info(`[Log] No __pycache__ directories found to clean`);
+            }
         }
+        core.info(`[Log] Cleanup completed successfully`);
     }
     catch (error) {
         core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -25804,6 +25817,7 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
     }
     const dockerCmd = `docker run \
         --rm \
+        --user $(id -u):$(id -g) \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
@@ -25896,7 +25910,7 @@ async function run() {
                     core.warning(`::warning::Unknown error occurred`);
                 }
             }
-            do_cleanup(workspace);
+            do_cleanup(workspace, defaultDockerImage);
         }
     }
     catch (err) {
