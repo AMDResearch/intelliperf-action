@@ -25798,7 +25798,25 @@ function run_in_docker(execDir, workspace, image, app, absOutputJson, topN, hugg
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     (0, child_process_1.execSync)(dockerCmd, { cwd: execDir, stdio: 'inherit' });
     // Cleanup step
-    (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
+    core.info(`[Log] Starting cleanup of __pycache__ directories in: ${workspace}`);
+    try {
+        const findCmd = `find . -type d -name "__pycache__"`;
+        const filesToRemove = (0, child_process_1.execSync)(findCmd, { cwd: workspace }).toString().trim();
+        if (filesToRemove) {
+            core.info(`[Log] Found __pycache__ directories to remove:`);
+            filesToRemove.split('\n').forEach(dir => {
+                core.info(`[Log] - ${dir}`);
+            });
+            (0, child_process_1.execSync)(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
+            core.info(`[Log] Cleanup completed successfully`);
+        }
+        else {
+            core.info(`[Log] No __pycache__ directories found to clean`);
+        }
+    }
+    catch (error) {
+        core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }
 async function run() {
     try {
