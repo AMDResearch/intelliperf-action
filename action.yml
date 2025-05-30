@@ -62,7 +62,7 @@ inputs:
     default: "false"
   maestro_actions_token:
     description: "GitHub token for PR creation (required if create_pr is true)"
-    required: false
+    required: false    
 runs:
   using: "node20"
   main: "dist/index.js"

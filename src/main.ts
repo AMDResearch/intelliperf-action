@@ -229,8 +229,14 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     // Create new branch
     execSync(`git checkout -b ${branchName}`);
 
-    // Add and commit modified files
-    modifiedFiles.forEach(file => {
+    // Add and commit modified files, excluding .github/actions/
+    const filesToCommit = Array.from(modifiedFiles).filter(file => !file.startsWith('.github/actions/'));
+    if (filesToCommit.length === 0) {
+        core.info('No relevant files to commit after filtering out .github/actions/');
+        return;
+    }
+
+    filesToCommit.forEach(file => {
         execSync(`git add ${file}`);
     });
 
@@ -241,18 +247,28 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     // Push changes
     execSync(`git push origin ${branchName}`);
 
-    // Create PR with JSON content in the body
-    const prBody = [
-        'This PR contains updates based on Maestro analysis.',
+    // Create PR with report message as main content and full JSON in details
+    const maxBodyLength = 65000; // Leave some buffer for other content
+    const baseContent = [
+        jsonContent?.report_message || 'No analysis report available.',
         '',
-        'Modified files:',
-        ...Array.from(modifiedFiles).map(f => `- ${f}`),
+        '<details>',
+        '<summary>Full Analysis Details</summary>',
         '',
-        'Maestro Analysis Results:',
-        '```json',
-        JSON.stringify(jsonContent, null, 2),
-        '```'
+        '```json'
     ].join('\n');
+
+    let jsonString = '';
+    if (jsonContent) {
+        jsonString = JSON.stringify(jsonContent, null, 2);
+        // Calculate remaining space for JSON
+        const remainingSpace = maxBodyLength - baseContent.length - 4; // 4 for closing ``` and newline
+        if (jsonString.length > remainingSpace) {
+            jsonString = jsonString.substring(0, remainingSpace) + '\n// ... (truncated)';
+        }
+    }
+
+    const prBody = `${baseContent}\n${jsonString}\n\`\`\`\n\n</details>`;
 
     const pr = await octokit.rest.pulls.create({
         owner: context.repo.owner,
@@ -384,17 +400,18 @@ async function run() {
                 }
             }
 
+            // Create PR if requested
+            if (createPr) {
+                if (!maestroActionsToken) {
+                    core.setFailed('maestro_actions_token input is required for PR creation');
+                    return;
+                }
+                await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
+            }
+
             do_cleanup(workspace, defaultDockerImage);
         }
 
-        // Create PR if requested
-        if (createPr) {
-            if (!maestroActionsToken) {
-                core.setFailed('maestro_actions_token input is required for PR creation');
-                return;
-            }
-            await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
-        }
     } catch (err: any) {
         core.setFailed(`Failed to run action: ${err.message}`);
     }

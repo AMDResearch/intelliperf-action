@@ -111,7 +111,7 @@ applications: >-
       "instrument_command": "./scripts/build.sh --instrument --clean",
       "project_directory": "./"
     }
-  ]
+            ]
 ```
 
 #### Bank Conflict Analysis
