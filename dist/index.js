@@ -30044,7 +30044,7 @@ function buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuil
     return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
 }
 function do_cleanup(workspace, dockerImage) {
-    core.info(`[Log] Starting cleanup of __pycache__ directories and build directory in: ${workspace}`);
+    core.info(`[Log] Starting cleanup of repository directory: ${workspace}`);
     try {
         if (dockerImage) {
             const homeDir = process.env.HOME;
@@ -30053,7 +30053,7 @@ function do_cleanup(workspace, dockerImage) {
                 -v ${homeDir}:${homeDir} \
                 -w ${workspace} \
                 ${dockerImage} \
-                bash -c "find . -type d -name '__pycache__' -exec rm -rf {} + && rm -rf build"`;
+                bash -c "rm -rf ./*"`;
             core.info(`[Log] Running cleanup inside Docker container`);
             (0, child_process_1.execSync)(dockerCmd, { stdio: 'inherit' });
         }
@@ -30321,15 +30321,6 @@ async function run() {
                 return;
             }
             await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
-        }
-        // Final cleanup - remove everything with sudo
-        core.info(`[Log] Performing final cleanup of workspace: ${workspace}`);
-        try {
-            (0, child_process_1.execSync)(`sudo rm -rf ${workspace}/*`, { stdio: 'inherit' });
-            core.info(`[Log] Final cleanup completed successfully`);
-        }
-        catch (error) {
-            core.warning(`[Log] Warning: Final cleanup encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
     catch (err) {
