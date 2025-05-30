@@ -30076,7 +30076,7 @@ function do_cleanup(workspace, dockerImage) {
         core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
-function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, huggingfaceToken) {
+function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, huggingfaceToken, formula) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
@@ -30090,19 +30090,22 @@ function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, hug
     core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
     (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
-function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToken) {
+function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToken, formula) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME;
+    const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
     }
+    // For non-diagnoseOnly formulas, use the workspace directory
+    const workingDir = formula && formula !== "diagnoseOnly" ? workspace : execDir;
     const dockerCmd = `docker run \
         --rm \
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
         -v ${homeDir}:${homeDir} \
-        -w ${execDir} \
+        -w ${workingDir} \
         ${image} \
         bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
     // Obfuscate the token after "--token"
@@ -30111,7 +30114,7 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
         safeDockerCmd = dockerCmd.replace(/(--token)\s+\S+/, '$1 ********');
     }
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
-    (0, child_process_1.execSync)(dockerCmd, { cwd: execDir, stdio: 'inherit' });
+    (0, child_process_1.execSync)(dockerCmd, { cwd: workingDir, stdio: 'inherit' });
 }
 function trackModifiedFiles(workspace) {
     // Get list of modified files using git status
@@ -30252,7 +30255,7 @@ async function run() {
                     const apptainerAbsImage = abs(defaultApptainerImage);
                     const overlay = createOverlay();
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, formula);
                         // Handle JSON file before tracking changes
                         lastJsonContent = handleOutputJson(absOutputJson);
                         trackModifiedFiles(workspace);
@@ -30262,7 +30265,7 @@ async function run() {
                     }
                 }
                 else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, formula);
                     // Handle JSON file before tracking changes
                     lastJsonContent = handleOutputJson(absOutputJson);
                     trackModifiedFiles(workspace);
