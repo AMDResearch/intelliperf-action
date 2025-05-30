@@ -35,6 +35,7 @@ type Application = {
     build_command?: string;
     instrument_command?: string;
     project_directory?: string;
+    formula?: string;  // Optional per-application formula
 };
 
 // Track modified files
@@ -74,14 +75,15 @@ function deleteOverlay(overlayPath: string) {
     }
 }
 
-function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string): string {
+function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string): string {
     const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
     const topNFlag = topN ? `--top_n ${topN}` : '';
-    const buildCommandFlag = app.build_command ? `--build_command "${app.build_command}"` : '';
-    const instrumentCommandFlag = app.instrument_command ? `--instrument_command "${app.instrument_command}"` : '';
+    const buildCommandFlag = app.build_command || globalBuildCommand ? `--build_command "${app.build_command || globalBuildCommand}"` : '';
+    const instrumentCommandFlag = app.instrument_command || globalInstrumentCommand ? `--instrument_command "${app.instrument_command || globalInstrumentCommand}"` : '';
     const projectDirFlag = app.project_directory ? `--project_directory ${app.project_directory}` : '';
+    const formulaFlag = app.formula || globalFormula ? `--formula ${app.formula || globalFormula}` : '';
 
-    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
+    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
 }
 
 function do_cleanup(workspace: string, dockerImage?: string) {
@@ -124,8 +126,8 @@ function do_cleanup(workspace: string, dockerImage?: string) {
     }
 }
 
-function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string, formula?: string) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand);
 
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
@@ -143,8 +145,8 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string, formula?: string) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
+function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand);
     const homeDir = process.env.HOME!;
     const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
 
@@ -153,7 +155,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
     }
 
     // For non-diagnoseOnly formulas, use the workspace directory
-    const workingDir = formula && formula !== "diagnoseOnly" ? workspace : execDir;
+    const workingDir = (app.formula || globalFormula) && (app.formula || globalFormula) !== "diagnoseOnly" ? workspace : execDir;
 
     const dockerCmd = `docker run \
         --rm \
@@ -258,7 +260,9 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
 
 async function run() {
     try {
-        const formula = core.getInput("formula");
+        const globalFormula = core.getInput("formula");
+        const globalBuildCommand = core.getInput("build_command");
+        const globalInstrumentCommand = core.getInput("instrument_command");
         const rawTopN = core.getInput("top_n");
         const topN = rawTopN !== '' ? rawTopN : '10';
         const defaultDockerImage = core.getInput("docker_image");
@@ -268,15 +272,27 @@ async function run() {
         const maestroActionsToken = core.getInput("maestro_actions_token");
 
         const validFormulas = ["diagnoseOnly", "atomicContention", "memoryAccess", "bankConflict"];
-        if (!validFormulas.includes(formula)) {
-            core.setFailed(`Invalid formula: ${formula}. Allowed formulas are: ${validFormulas.join(", ")}`);
+
+        // Validate global formula if provided
+        if (globalFormula && !validFormulas.includes(globalFormula)) {
+            core.setFailed(`Invalid global formula: ${globalFormula}. Allowed formulas are: ${validFormulas.join(", ")}`);
             return;
         }
 
         const appsJson = core.getInput("applications");
         const apps: Application[] = JSON.parse(appsJson);
 
-        core.info(`Formula: ${formula}`);
+        // Validate per-application formulas if provided
+        for (const app of apps) {
+            if (app.formula && !validFormulas.includes(app.formula)) {
+                core.setFailed(`Invalid formula for application ${app.command}: ${app.formula}. Allowed formulas are: ${validFormulas.join(", ")}`);
+                return;
+            }
+        }
+
+        core.info(`Global Formula: ${globalFormula || 'Not specified'}`);
+        core.info(`Global Build Command: ${globalBuildCommand || 'Not specified'}`);
+        core.info(`Global Instrument Command: ${globalInstrumentCommand || 'Not specified'}`);
         core.info(`Top N: ${topN}`);
         if (defaultDockerImage) {
             core.info(`Default Docker Image: ${defaultDockerImage}`);
@@ -332,7 +348,7 @@ async function run() {
                     const overlay = createOverlay();
 
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, formula);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand);
                         // Handle JSON file before tracking changes
                         lastJsonContent = handleOutputJson(absOutputJson);
                         trackModifiedFiles(workspace);
@@ -340,7 +356,7 @@ async function run() {
                         deleteOverlay(overlay);
                     }
                 } else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, formula);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand);
                     // Handle JSON file before tracking changes
                     lastJsonContent = handleOutputJson(absOutputJson);
                     trackModifiedFiles(workspace);

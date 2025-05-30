@@ -26,10 +26,16 @@ name: "Maestro Action"
 description: "A GitHub Action wrapper for Maestro"
 inputs:
   formula:
-    description: "Maestro formula to use"
-    required: true
+    description: "Global Maestro formula to use for all applications (can be overridden per application)"
+    required: false
+  build_command:
+    description: "Global build command to use for all applications (can be overridden per application)"
+    required: false
+  instrument_command:
+    description: "Global instrument command to use for all applications (can be overridden per application)"
+    required: false
   applications:
-    description: "List of application objects. Each object can have: command (required), output_json (optional), build_script (optional), build_command (optional), instrument_command (optional), project_directory (optional)"
+    description: "List of application objects. Each object can have: command (required), output_json (optional), build_script (optional), build_command (optional), instrument_command (optional), project_directory (optional), formula (optional)"
     required: true
   docker_image:
     description: "Default Docker image to use"
