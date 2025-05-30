@@ -30034,14 +30034,15 @@ function deleteOverlay(overlayPath) {
         fs.unlinkSync(overlayPath);
     }
 }
-function buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand) {
+function buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey) {
     const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
     const topNFlag = topN ? `--top_n ${topN}` : '';
     const buildCommandFlag = app.build_command || globalBuildCommand ? `--build_command "${app.build_command || globalBuildCommand}"` : '';
     const instrumentCommandFlag = app.instrument_command || globalInstrumentCommand ? `--instrument_command "${app.instrument_command || globalInstrumentCommand}"` : '';
     const projectDirFlag = app.project_directory ? `--project_directory ${app.project_directory}` : '';
     const formulaFlag = app.formula || globalFormula ? `--formula ${app.formula || globalFormula}` : '';
-    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
+    const llmGatewayKeyFlag = llmGatewayKey ? `--llm_gateway_key ${llmGatewayKey}` : '';
+    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} ${llmGatewayKeyFlag} -- ${app.command}`;
 }
 function do_cleanup(workspace, dockerImage) {
     core.info(`[Log] Starting cleanup of __pycache__ directories and build directory in: ${workspace}`);
@@ -30082,8 +30083,8 @@ function do_cleanup(workspace, dockerImage) {
         core.warning(`[Log] Warning: Cleanup step encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
-function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand);
+function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
     }
@@ -30093,11 +30094,14 @@ function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, hug
     if (huggingfaceToken) {
         safeApptainerCmd = apptainerCmd.replace(/(--token)\s+\S+/, '$1 ********');
     }
+    if (llmGatewayKey) {
+        safeApptainerCmd = safeApptainerCmd.replace(/(--llm_gateway_key)\s+\S+/, '$1 ********');
+    }
     core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
     (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
-function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand);
+function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
     const homeDir = process.env.HOME;
     const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
     if (huggingfaceToken) {
@@ -30112,12 +30116,17 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
         --group-add video \
         -v ${homeDir}:${homeDir} \
         -w ${workingDir} \
+        ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey} \\` : ''} \
         ${image} \
         bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
     // Obfuscate the token after "--token"
     let safeDockerCmd = dockerCmd;
     if (huggingfaceToken) {
         safeDockerCmd = dockerCmd.replace(/(--token)\s+\S+/, '$1 ********');
+    }
+    if (llmGatewayKey) {
+        safeDockerCmd = safeDockerCmd.replace(/(--llm_gateway_key)\s+\S+/, '$1 ********');
+        safeDockerCmd = safeDockerCmd.replace(/(-e LLM_GATEWAY_KEY=)\S+/, '$1********');
     }
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
     (0, child_process_1.execSync)(dockerCmd, { cwd: workingDir, stdio: 'inherit' });
@@ -30196,6 +30205,7 @@ async function run() {
         const globalFormula = core.getInput("formula");
         const globalBuildCommand = core.getInput("build_command");
         const globalInstrumentCommand = core.getInput("instrument_command");
+        const llmGatewayKey = core.getInput("llm_gateway_key");
         const rawTopN = core.getInput("top_n");
         const topN = rawTopN !== '' ? rawTopN : '10';
         const defaultDockerImage = core.getInput("docker_image");
@@ -30221,6 +30231,7 @@ async function run() {
         core.info(`Global Formula: ${globalFormula || 'Not specified'}`);
         core.info(`Global Build Command: ${globalBuildCommand || 'Not specified'}`);
         core.info(`Global Instrument Command: ${globalInstrumentCommand || 'Not specified'}`);
+        core.info(`LLM Gateway Key: ${llmGatewayKey ? 'Specified' : 'Not specified'}`);
         core.info(`Top N: ${topN}`);
         if (defaultDockerImage) {
             core.info(`Default Docker Image: ${defaultDockerImage}`);
@@ -30273,7 +30284,7 @@ async function run() {
                     const apptainerAbsImage = abs(defaultApptainerImage);
                     const overlay = createOverlay();
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
                         // Handle JSON file before tracking changes
                         lastJsonContent = handleOutputJson(absOutputJson);
                         trackModifiedFiles(workspace);
@@ -30283,7 +30294,7 @@ async function run() {
                     }
                 }
                 else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
                     // Handle JSON file before tracking changes
                     lastJsonContent = handleOutputJson(absOutputJson);
                     trackModifiedFiles(workspace);
