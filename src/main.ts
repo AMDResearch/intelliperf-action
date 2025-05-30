@@ -296,7 +296,7 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     let jsonString = '';
     if (jsonContent) {
         // Calculate remaining space for JSON
-        const remainingSpace = maxBodyLength - baseContent.length - 10; // 10 for closing ``` and newlines
+        const remainingSpace = maxBodyLength - baseContent.length - 1000;
         jsonString = JSON.stringify(jsonContent, null, 2);
         if (jsonString.length > remainingSpace) {
             // Keep only essential fields
