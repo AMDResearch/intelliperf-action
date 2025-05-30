@@ -30113,6 +30113,7 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
+        --network=host \
         -v ${homeDir}:${homeDir} \
         -w ${workingDir} \
         ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey}` : ''} \
