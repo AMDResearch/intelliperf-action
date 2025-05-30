@@ -272,12 +272,13 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     execSync(`git push origin ${branchName}`);
 
     // Format PR title and body
-    const formula = jsonContent?.formula || 'unknown';
+    const formula = globalFormula || app.formula || 'unknown';
     const formattedFormula = formatFormulaName(formula);
     const title = `[Maestro] Optimizing ${formattedFormula}`;
 
     // Format PR body with emojis and better structure
-    const prBody = [
+    const maxBodyLength = 65000; // Leave some buffer for other content
+    const baseContent = [
         '# 🎻🕺 Maestro 🕺🎼',
         '',
         `${jsonContent?.bottleneck_report || 'No analysis report available.'} This PR contains an optimized and validated implementation. See log below for complete output.`,
@@ -289,12 +290,32 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
         '<details>',
         '<summary>Click to expand log output</summary>',
         '',
-        '```json',
-        JSON.stringify(jsonContent, null, 2),
-        '```',
-        '',
-        '</details>'
+        '```json'
     ].join('\n');
+
+    let jsonString = '';
+    if (jsonContent) {
+        // Calculate remaining space for JSON
+        const remainingSpace = maxBodyLength - baseContent.length - 10; // 10 for closing ``` and newlines
+        jsonString = JSON.stringify(jsonContent, null, 2);
+        if (jsonString.length > remainingSpace) {
+            // Keep only essential fields
+            const essentialContent = {
+                formula: jsonContent.formula,
+                bottleneck_report: jsonContent.bottleneck_report,
+                report_message: jsonContent.report_message,
+                // Add any other essential fields here
+            };
+            jsonString = JSON.stringify(essentialContent, null, 2);
+
+            // If still too long, truncate
+            if (jsonString.length > remainingSpace) {
+                jsonString = jsonString.substring(0, remainingSpace) + '\n// ... (truncated)';
+            }
+        }
+    }
+
+    const prBody = `${baseContent}\n${jsonString}\n\`\`\`\n\n</details>`;
 
     const pr = await octokit.rest.pulls.create({
         owner: context.repo.owner,
