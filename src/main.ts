@@ -118,7 +118,7 @@ function do_cleanup(workspace: string, dockerImage?: string) {
     }
 }
 
-function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
+function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string, formula?: string) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
 
     if (huggingfaceToken) {
@@ -137,13 +137,17 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string) {
+function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string, formula?: string) {
     let maestroCmd = buildMaestroCommand(app, absOutputJson, topN);
     const homeDir = process.env.HOME!;
+    const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
 
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
     }
+
+    // For non-diagnoseOnly formulas, use the workspace directory
+    const workingDir = formula && formula !== "diagnoseOnly" ? workspace : execDir;
 
     const dockerCmd = `docker run \
         --rm \
@@ -151,7 +155,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         --device=/dev/dri \
         --group-add video \
         -v ${homeDir}:${homeDir} \
-        -w ${execDir} \
+        -w ${workingDir} \
         ${image} \
         bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
 
@@ -162,7 +166,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
     }
 
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
-    execSync(dockerCmd, { cwd: execDir, stdio: 'inherit' });
+    execSync(dockerCmd, { cwd: workingDir, stdio: 'inherit' });
 }
 
 function trackModifiedFiles(workspace: string) {
@@ -322,7 +326,7 @@ async function run() {
                     const overlay = createOverlay();
 
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, formula);
                         // Handle JSON file before tracking changes
                         lastJsonContent = handleOutputJson(absOutputJson);
                         trackModifiedFiles(workspace);
@@ -330,7 +334,7 @@ async function run() {
                         deleteOverlay(overlay);
                     }
                 } else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, formula);
                     // Handle JSON file before tracking changes
                     lastJsonContent = handleOutputJson(absOutputJson);
                     trackModifiedFiles(workspace);
