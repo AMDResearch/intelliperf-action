@@ -153,7 +153,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         -v ${homeDir}:${homeDir} \
         -w ${execDir} \
         ${image} \
-        bash -c "${maestroCmd}"`;
+        bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
 
     // Obfuscate the token after "--token"
     let safeDockerCmd = dockerCmd;
