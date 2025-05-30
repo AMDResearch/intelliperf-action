@@ -30191,8 +30191,9 @@ async function run() {
         const defaultApptainerImage = core.getInput("apptainer_image");
         const huggingfaceToken = core.getInput("huggingface_token");
         const createPr = core.getInput("create_pr") === "true";
-        if (formula !== "diagnoseOnly") {
-            core.setFailed(`Invalid formula: ${formula}. Only "diagnoseOnly" is allowed.`);
+        const validFormulas = ["diagnoseOnly", "atomicContention", "memoryAccess", "bankConflict"];
+        if (!validFormulas.includes(formula)) {
+            core.setFailed(`Invalid formula: ${formula}. Allowed formulas are: ${validFormulas.join(", ")}`);
             return;
         }
         const appsJson = core.getInput("applications");
