@@ -214,6 +214,30 @@ function handleOutputJson(outputJson?: string): any {
     return null;
 }
 
+function formatFormulaName(formula: string): string {
+    const formulaMap: { [key: string]: { name: string, emoji: string } } = {
+        'bankConflict': {
+            name: 'bank conflict',
+            emoji: '💥'  // Explosion for conflicts
+        },
+        'memoryAccess': {
+            name: 'memory access',
+            emoji: '📊'  // Chart for memory patterns
+        },
+        'atomicContention': {
+            name: 'atomic contention',
+            emoji: '⚛️'  // Atom symbol for atomic operations
+        },
+        'diagnoseOnly': {
+            name: 'diagnostics',
+            emoji: '🔍'  // Magnifying glass for diagnostics
+        }
+    };
+
+    const formulaInfo = formulaMap[formula] || { name: formula, emoji: '⚡' };
+    return `${formulaInfo.emoji} ${formulaInfo.name}`;
+}
+
 async function createPullRequest(token: string, modifiedFiles: Set<string>, jsonContent: any) {
     const octokit = github.getOctokit(token);
     const context = github.context;
@@ -247,33 +271,35 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     // Push changes
     execSync(`git push origin ${branchName}`);
 
-    // Create PR with report message as main content and full JSON in details
-    const maxBodyLength = 65000; // Leave some buffer for other content
-    const baseContent = [
+    // Format PR title and body
+    const formula = jsonContent?.formula || 'unknown';
+    const formattedFormula = formatFormulaName(formula);
+    const title = `[Maestro] Optimizing ${formattedFormula}`;
+
+    // Format PR body with emojis and better structure
+    const prBody = [
+        '🎻🕺 Maestro 🕺🎼',
+        '',
         jsonContent?.report_message || 'No analysis report available.',
         '',
-        '<details>',
-        '<summary>Full Analysis Details</summary>',
+        '## Optimization report',
         '',
-        '```json'
+        jsonContent?.optimization_report || 'No optimization details available.',
+        '',
+        '<details>',
+        '<summary>Click to expand log output</summary>',
+        '',
+        '```json',
+        JSON.stringify(jsonContent, null, 2),
+        '```',
+        '',
+        '</details>'
     ].join('\n');
-
-    let jsonString = '';
-    if (jsonContent) {
-        jsonString = JSON.stringify(jsonContent, null, 2);
-        // Calculate remaining space for JSON
-        const remainingSpace = maxBodyLength - baseContent.length - 4; // 4 for closing ``` and newline
-        if (jsonString.length > remainingSpace) {
-            jsonString = jsonString.substring(0, remainingSpace) + '\n// ... (truncated)';
-        }
-    }
-
-    const prBody = `${baseContent}\n${jsonString}\n\`\`\`\n\n</details>`;
 
     const pr = await octokit.rest.pulls.create({
         owner: context.repo.owner,
         repo: context.repo.repo,
-        title: 'Maestro Analysis Updates',
+        title: title,
         body: prBody,
         head: branchName,
         base: baseBranch
