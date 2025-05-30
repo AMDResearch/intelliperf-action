@@ -165,6 +165,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         --device=/dev/kfd \
         --device=/dev/dri \
         --group-add video \
+        --network=host \
         -v ${homeDir}:${homeDir} \
         -w ${workingDir} \
         ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey}` : ''} \
