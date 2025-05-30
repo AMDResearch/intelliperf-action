@@ -30041,8 +30041,7 @@ function buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuil
     const instrumentCommandFlag = app.instrument_command || globalInstrumentCommand ? `--instrument_command "${app.instrument_command || globalInstrumentCommand}"` : '';
     const projectDirFlag = app.project_directory || globalProjectDirectory ? `--project_directory ${app.project_directory || globalProjectDirectory}` : '';
     const formulaFlag = app.formula || globalFormula ? `--formula ${app.formula || globalFormula}` : '';
-    const llmGatewayKeyFlag = llmGatewayKey ? `--llm_gateway_key ${llmGatewayKey}` : '';
-    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} ${llmGatewayKeyFlag} -- ${app.command}`;
+    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
 }
 function do_cleanup(workspace, dockerImage) {
     core.info(`[Log] Starting cleanup of __pycache__ directories and build directory in: ${workspace}`);
@@ -30095,7 +30094,7 @@ function run_in_apptainer(execDir, image, app, overlay, absOutputJson, topN, hug
         safeApptainerCmd = apptainerCmd.replace(/(--token)\s+\S+/, '$1 ********');
     }
     if (llmGatewayKey) {
-        safeApptainerCmd = safeApptainerCmd.replace(/(--llm_gateway_key)\s+\S+/, '$1 ********');
+        safeApptainerCmd = safeApptainerCmd.replace(/(-e LLM_GATEWAY_KEY=)\S+/, '$1********');
     }
     core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
     (0, child_process_1.execSync)(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
@@ -30116,7 +30115,7 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
         --group-add video \
         -v ${homeDir}:${homeDir} \
         -w ${workingDir} \
-        ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey} \\` : ''} \
+        ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey}` : ''} \
         ${image} \
         bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
     // Obfuscate the token after "--token"
@@ -30125,7 +30124,6 @@ function run_in_docker(execDir, image, app, absOutputJson, topN, huggingfaceToke
         safeDockerCmd = dockerCmd.replace(/(--token)\s+\S+/, '$1 ********');
     }
     if (llmGatewayKey) {
-        safeDockerCmd = safeDockerCmd.replace(/(--llm_gateway_key)\s+\S+/, '$1 ********');
         safeDockerCmd = safeDockerCmd.replace(/(-e LLM_GATEWAY_KEY=)\S+/, '$1********');
     }
     core.info(`[Log] Executing in Docker: ${safeDockerCmd}`);
