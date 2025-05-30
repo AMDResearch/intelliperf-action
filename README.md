@@ -71,6 +71,7 @@ jobs:
           apptainer_image: "/path/to/default_apptainer.sif" # Optional if using Apptainer
           top_n: "10"                                       # Optional, defaults to 10
           create_pr: "true"                                # Optional, creates PR with changes
+          maestro_actions_token: ${{ secrets.MAESTRO_ACTIONS_TOKEN }}  # Required if create_pr is true
           applications: >-
             [
               { 
@@ -81,8 +82,6 @@ jobs:
                 "output_json": "${{ env.OUTPUT_JSON }}"
               }
             ]
-        env:
-          MAESTRO_ACTIONS_TOKEN: ${{ secrets.MAESTRO_ACTIONS_TOKEN }}  # Required for PR creation
 ```
 
 ### Formula Examples
@@ -140,29 +139,8 @@ applications: >-
 | `top_n` | Top N kernels to report | No | 10 |
 | `huggingface_token` | Huggingface token | No | - |
 | `create_pr` | Whether to create a PR with changes | No | false |
+| `maestro_actions_token` | GitHub token for PR creation (required if create_pr is true) | No | - |
 
 ### Application Object
 
-Each application in the `applications` array can have the following properties:
-
-| Property | Description | Required |
-|----------|-------------|----------|
-| `command` | Command to run | Yes |
-| `build_command` | Build command to execute | No |
-| `instrument_command` | Instrumentation command to execute | No |
-| `project_directory` | Project directory path | No |
-| `output_json` | Path to output JSON file | No |
-
-## 🔐 Secrets
-
-| Secret | Description | Required |
-|--------|-------------|----------|
-| `MAESTRO_ACTIONS_TOKEN` | GitHub token for PR creation | Yes (if create_pr is true) |
-
-## Building
-
-```terminal
-npm install
-npm install --save-dev @vercel/ncc
-npm run build
-```
+Each application in the `applications`
