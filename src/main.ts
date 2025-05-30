@@ -75,13 +75,13 @@ function deleteOverlay(overlayPath: string) {
 }
 
 function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string): string {
-    const outputFlag = absOutputJson ? `--output_file "${absOutputJson}"` : '';
-    const topNFlag = topN ? `--top_n "${topN}"` : '';
-    const buildCommandFlag = app.build_command ? `--build_command "${app.build_command.replace(/"/g, '\\"')}"` : '';
-    const instrumentCommandFlag = app.instrument_command ? `--instrument_command "${app.instrument_command.replace(/"/g, '\\"')}"` : '';
-    const projectDirFlag = app.project_directory ? `--project_directory "${app.project_directory.replace(/"/g, '\\"')}"` : '';
+    const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
+    const topNFlag = topN ? `--top_n ${topN}` : '';
+    const buildCommandFlag = app.build_command ? `--build_command "${app.build_command}"` : '';
+    const instrumentCommandFlag = app.instrument_command ? `--instrument_command "${app.instrument_command}"` : '';
+    const projectDirFlag = app.project_directory ? `--project_directory ${app.project_directory}` : '';
 
-    return `maestro -vvv ${outputFlag} ${topNFlag} ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -- "${app.command.replace(/"/g, '\\"')}"`;
+    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} -- ${app.command}`;
 }
 
 function do_cleanup(workspace: string, dockerImage?: string) {
