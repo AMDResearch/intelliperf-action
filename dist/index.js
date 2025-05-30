@@ -30322,6 +30322,15 @@ async function run() {
             }
             await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
         }
+        // Final cleanup - remove everything with sudo
+        core.info(`[Log] Performing final cleanup of workspace: ${workspace}`);
+        try {
+            (0, child_process_1.execSync)(`sudo rm -rf ${workspace}/*`, { stdio: 'inherit' });
+            core.info(`[Log] Final cleanup completed successfully`);
+        }
+        catch (error) {
+            core.warning(`[Log] Warning: Final cleanup encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
     catch (err) {
         core.setFailed(`Failed to run action: ${err.message}`);
