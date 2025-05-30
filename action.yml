@@ -34,6 +34,9 @@ inputs:
   instrument_command:
     description: "Global instrument command to use for all applications (can be overridden per application)"
     required: false
+  project_directory:
+    description: "Global project directory to use for all applications (can be overridden per application)"
+    required: false
   applications:
     description: "List of application objects. Each object can have: command (required), output_json (optional), build_script (optional), build_command (optional), instrument_command (optional), project_directory (optional), formula (optional)"
     required: true

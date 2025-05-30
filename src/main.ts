@@ -75,12 +75,12 @@ function deleteOverlay(overlayPath: string) {
     }
 }
 
-function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string): string {
+function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string): string {
     const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
     const topNFlag = topN ? `--top_n ${topN}` : '';
     const buildCommandFlag = app.build_command || globalBuildCommand ? `--build_command "${app.build_command || globalBuildCommand}"` : '';
     const instrumentCommandFlag = app.instrument_command || globalInstrumentCommand ? `--instrument_command "${app.instrument_command || globalInstrumentCommand}"` : '';
-    const projectDirFlag = app.project_directory ? `--project_directory ${app.project_directory}` : '';
+    const projectDirFlag = app.project_directory || globalProjectDirectory ? `--project_directory ${app.project_directory || globalProjectDirectory}` : '';
     const formulaFlag = app.formula || globalFormula ? `--formula ${app.formula || globalFormula}` : '';
     const llmGatewayKeyFlag = llmGatewayKey ? `--llm_gateway_key ${llmGatewayKey}` : '';
 
@@ -127,8 +127,8 @@ function do_cleanup(workspace: string, dockerImage?: string) {
     }
 }
 
-function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
+function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
 
     if (huggingfaceToken) {
         maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
@@ -149,8 +149,8 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
     execSync(apptainerCmd, { cwd: execDir, stdio: 'inherit' });
 }
 
-function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
+function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string) {
+    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
     const homeDir = process.env.HOME!;
     const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
 
@@ -272,6 +272,7 @@ async function run() {
         const globalFormula = core.getInput("formula");
         const globalBuildCommand = core.getInput("build_command");
         const globalInstrumentCommand = core.getInput("instrument_command");
+        const globalProjectDirectory = core.getInput("project_directory");
         const llmGatewayKey = core.getInput("llm_gateway_key");
         const rawTopN = core.getInput("top_n");
         const topN = rawTopN !== '' ? rawTopN : '10';
@@ -303,6 +304,7 @@ async function run() {
         core.info(`Global Formula: ${globalFormula || 'Not specified'}`);
         core.info(`Global Build Command: ${globalBuildCommand || 'Not specified'}`);
         core.info(`Global Instrument Command: ${globalInstrumentCommand || 'Not specified'}`);
+        core.info(`Global Project Directory: ${globalProjectDirectory || 'Not specified'}`);
         core.info(`LLM Gateway Key: ${llmGatewayKey ? 'Specified' : 'Not specified'}`);
         core.info(`Top N: ${topN}`);
         if (defaultDockerImage) {
@@ -359,7 +361,7 @@ async function run() {
                     const overlay = createOverlay();
 
                     try {
-                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
+                        run_in_apptainer(execDir, apptainerAbsImage, app, overlay, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
                         // Handle JSON file before tracking changes
                         lastJsonContent = handleOutputJson(absOutputJson);
                         trackModifiedFiles(workspace);
@@ -367,7 +369,7 @@ async function run() {
                         deleteOverlay(overlay);
                     }
                 } else if (defaultDockerImage) {
-                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey);
+                    run_in_docker(execDir, defaultDockerImage, app, absOutputJson, topN, huggingfaceToken, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
                     // Handle JSON file before tracking changes
                     lastJsonContent = handleOutputJson(absOutputJson);
                     trackModifiedFiles(workspace);
