@@ -30,7 +30,14 @@ A GitHub Action wrapper for Maestro.
 
 ## ✨ Features
 
-- Accepts a `formula` input (must be `"diagnoseOnly"`)
+- Supports multiple Maestro formulas:
+  - `atomicContention`: Analyzes atomic operation contention
+  - `memoryAccess`: Analyzes memory access patterns
+  - `bankConflict`: Analyzes bank conflicts
+  - `diagnoseOnly`: General diagnostic analysis
+- Supports Docker and Apptainer containers
+- Optional PR creation with analysis results
+- Configurable build, instrument commands and project directory
 
 ---
 
@@ -59,18 +66,98 @@ jobs:
       - name: Run Maestro Action
         uses: ./.github/actions/maestro-action
         with:
-          formula: "diagnoseOnly"
+          formula: "atomicContention"  # One of: atomicContention, memoryAccess, bankConflict, diagnoseOnly
           docker_image: "my-default-docker:latest"         # Optional if using Docker
           apptainer_image: "/path/to/default_apptainer.sif" # Optional if using Apptainer
           top_n: "10"                                       # Optional, defaults to 10
+          create_pr: "true"                                # Optional, creates PR with changes
           applications: >-
             [
-              { "command": "python app1.py", "build_script": "./build.sh", "output_json": "output1.json" },
-              { "command": "python app2.py", "output_json": "output2.json" }
+              { 
+                "command": "./build/examples/contention/reduction",
+                "build_command": "./scripts/build.sh",
+                "instrument_command": "./scripts/build.sh --instrument --clean",
+                "project_directory": "./",
+                "output_json": "${{ env.OUTPUT_JSON }}"
+              }
             ]
-
+        env:
+          MAESTRO_ACTIONS_TOKEN: ${{ secrets.MAESTRO_ACTIONS_TOKEN }}  # Required for PR creation
 ```
 
+### Formula Examples
+
+#### Atomic Contention Analysis
+```yaml
+formula: "atomicContention"
+applications: >-
+  [
+    {
+      "command": "./build/examples/contention/reduction",
+      "build_command": "./scripts/build.sh",
+      "instrument_command": "./scripts/build.sh --instrument --clean",
+      "project_directory": "./"
+    }
+  ]
+```
+
+#### Memory Access Analysis
+```yaml
+formula: "memoryAccess"
+applications: >-
+  [
+    {
+      "command": "./build/examples/access_pattern/uncoalesced",
+      "build_command": "./scripts/build.sh",
+      "instrument_command": "./scripts/build.sh --instrument --clean",
+      "project_directory": "./"
+    }
+  ]
+```
+
+#### Bank Conflict Analysis
+```yaml
+formula: "bankConflict"
+applications: >-
+  [
+    {
+      "command": "./build/examples/bank_conflict/matrix_transpose",
+      "build_command": "./scripts/build.sh",
+      "instrument_command": "./scripts/build.sh --instrument --clean",
+      "project_directory": "./"
+    }
+  ]
+```
+
+## 🔧 Inputs
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `formula` | Maestro formula to use. One of: atomicContention, memoryAccess, bankConflict, diagnoseOnly | Yes | - |
+| `applications` | List of application objects | Yes | - |
+| `docker_image` | Default Docker image to use | No | - |
+| `apptainer_image` | Default Apptainer image to use | No | - |
+| `top_n` | Top N kernels to report | No | 10 |
+| `huggingface_token` | Huggingface token | No | - |
+| `create_pr` | Whether to create a PR with changes | No | false |
+
+### Application Object
+
+Each application in the `applications` array can have the following properties:
+
+| Property | Description | Required |
+|----------|-------------|----------|
+| `command` | Command to run | Yes |
+| `build_command` | Build command to execute | No |
+| `instrument_command` | Instrumentation command to execute | No |
+| `project_directory` | Project directory path | No |
+| `output_json` | Path to output JSON file | No |
+
+## 🔐 Secrets
+
+| Secret | Description | Required |
+|--------|-------------|----------|
+| `MAESTRO_ACTIONS_TOKEN` | GitHub token for PR creation | Yes (if create_pr is true) |
 
 ## Building
 
