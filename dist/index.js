@@ -30210,13 +30210,13 @@ async function createPullRequest(token, modifiedFiles, jsonContent) {
     const title = `[Maestro] Optimizing ${formattedFormula}`;
     // Format PR body with emojis and better structure
     const prBody = [
-        '🎻🕺 Maestro 🕺🎼',
+        '# 🎻🕺 Maestro 🕺🎼',
         '',
-        (jsonContent === null || jsonContent === void 0 ? void 0 : jsonContent.report_message) || 'No analysis report available.',
+        `${(jsonContent === null || jsonContent === void 0 ? void 0 : jsonContent.bottleneck_report) || 'No analysis report available.'} This PR contains an optimized and validated implementation. See log below for complete output.`,
         '',
         '## Optimization report',
         '',
-        (jsonContent === null || jsonContent === void 0 ? void 0 : jsonContent.optimization_report) || 'No optimization details available.',
+        (jsonContent === null || jsonContent === void 0 ? void 0 : jsonContent.report_message) || 'No optimization details available.',
         '',
         '<details>',
         '<summary>Click to expand log output</summary>',
