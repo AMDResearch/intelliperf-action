@@ -85,7 +85,7 @@ function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: st
 }
 
 function do_cleanup(workspace: string, dockerImage?: string) {
-    core.info(`[Log] Starting cleanup of __pycache__ directories in: ${workspace}`);
+    core.info(`[Log] Starting cleanup of __pycache__ directories and build directory in: ${workspace}`);
     try {
         if (dockerImage) {
             const homeDir = process.env.HOME!;
@@ -94,7 +94,7 @@ function do_cleanup(workspace: string, dockerImage?: string) {
                 -v ${homeDir}:${homeDir} \
                 -w ${workspace} \
                 ${dockerImage} \
-                bash -c "find . -type d -name '__pycache__' -exec rm -rf {} +"`;
+                bash -c "find . -type d -name '__pycache__' -exec rm -rf {} + && rm -rf build"`;
 
             core.info(`[Log] Running cleanup inside Docker container`);
             execSync(dockerCmd, { stdio: 'inherit' });
@@ -110,6 +110,12 @@ function do_cleanup(workspace: string, dockerImage?: string) {
                 execSync(`find . -type d -name "__pycache__" -exec rm -rf {} +`, { cwd: workspace, stdio: 'inherit' });
             } else {
                 core.info(`[Log] No __pycache__ directories found to clean`);
+            }
+
+            // Remove build directory
+            if (fs.existsSync(path.join(workspace, 'build'))) {
+                core.info(`[Log] Removing build directory`);
+                fs.rmSync(path.join(workspace, 'build'), { recursive: true, force: true });
             }
         }
         core.info(`[Log] Cleanup completed successfully`);
