@@ -82,9 +82,8 @@ function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: st
     const instrumentCommandFlag = app.instrument_command || globalInstrumentCommand ? `--instrument_command "${app.instrument_command || globalInstrumentCommand}"` : '';
     const projectDirFlag = app.project_directory || globalProjectDirectory ? `--project_directory ${app.project_directory || globalProjectDirectory}` : '';
     const formulaFlag = app.formula || globalFormula ? `--formula ${app.formula || globalFormula}` : '';
-    const llmGatewayKeyFlag = llmGatewayKey ? `--llm_gateway_key ${llmGatewayKey}` : '';
 
-    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} ${llmGatewayKeyFlag} -- ${app.command}`;
+    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
 }
 
 function do_cleanup(workspace: string, dockerImage?: string) {
@@ -142,7 +141,7 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
         safeApptainerCmd = apptainerCmd.replace(/(--token)\s+\S+/, '$1 ********');
     }
     if (llmGatewayKey) {
-        safeApptainerCmd = safeApptainerCmd.replace(/(--llm_gateway_key)\s+\S+/, '$1 ********');
+        safeApptainerCmd = safeApptainerCmd.replace(/(-e LLM_GATEWAY_KEY=)\S+/, '$1********');
     }
 
     core.info(`[Log] Executing in Apptainer: ${safeApptainerCmd}`);
@@ -168,7 +167,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         --group-add video \
         -v ${homeDir}:${homeDir} \
         -w ${workingDir} \
-        ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey} \\` : ''} \
+        ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey}` : ''} \
         ${image} \
         bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
 
@@ -178,7 +177,6 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         safeDockerCmd = dockerCmd.replace(/(--token)\s+\S+/, '$1 ********');
     }
     if (llmGatewayKey) {
-        safeDockerCmd = safeDockerCmd.replace(/(--llm_gateway_key)\s+\S+/, '$1 ********');
         safeDockerCmd = safeDockerCmd.replace(/(-e LLM_GATEWAY_KEY=)\S+/, '$1********');
     }
 
