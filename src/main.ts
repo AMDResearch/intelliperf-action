@@ -278,13 +278,13 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
 
     // Format PR body with emojis and better structure
     const prBody = [
-        '🎻🕺 Maestro 🕺🎼',
+        '# 🎻🕺 Maestro 🕺🎼',
         '',
-        jsonContent?.report_message || 'No analysis report available.',
+        `${jsonContent?.bottleneck_report || 'No analysis report available.'} This PR contains an optimized and validated implementation. See log below for complete output.`,
         '',
         '## Optimization report',
         '',
-        jsonContent?.optimization_report || 'No optimization details available.',
+        jsonContent?.report_message || 'No optimization details available.',
         '',
         '<details>',
         '<summary>Click to expand log output</summary>',
