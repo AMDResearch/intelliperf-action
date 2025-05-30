@@ -238,7 +238,7 @@ function formatFormulaName(formula: string): string {
     return `${formulaInfo.emoji} ${formulaInfo.name}`;
 }
 
-async function createPullRequest(token: string, modifiedFiles: Set<string>, jsonContent: any) {
+async function createPullRequest(token: string, modifiedFiles: Set<string>, jsonContent: any, globalFormula?: string, app?: Application) {
     const octokit = github.getOctokit(token);
     const context = github.context;
 
@@ -272,7 +272,7 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     execSync(`git push origin ${branchName}`);
 
     // Format PR title and body
-    const formula = globalFormula || app.formula || 'unknown';
+    const formula = globalFormula || app?.formula || 'unknown';
     const formattedFormula = formatFormulaName(formula);
     const title = `[Maestro] Optimizing ${formattedFormula}`;
 
@@ -453,7 +453,7 @@ async function run() {
                     core.setFailed('maestro_actions_token input is required for PR creation');
                     return;
                 }
-                await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
+                await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent, globalFormula, app);
             }
 
             do_cleanup(workspace, defaultDockerImage);
