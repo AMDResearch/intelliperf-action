@@ -30036,7 +30036,7 @@ function deleteOverlay(overlayPath) {
 }
 function buildMaestroCommand(app, absOutputJson, topN) {
     const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
-    const topNFlag = topN ? `--top-n ${topN}` : '';
+    const topNFlag = topN ? `--top_n ${topN}` : '';
     const buildCommandFlag = app.build_command ? `--build-command "${app.build_command}"` : '';
     const instrumentCommandFlag = app.instrument_command ? `--instrument-command "${app.instrument_command}"` : '';
     const projectDirFlag = app.project_directory ? `--project-directory "${app.project_directory}"` : '';
