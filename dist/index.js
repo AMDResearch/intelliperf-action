@@ -30191,6 +30191,7 @@ async function run() {
         const defaultApptainerImage = core.getInput("apptainer_image");
         const huggingfaceToken = core.getInput("huggingface_token");
         const createPr = core.getInput("create_pr") === "true";
+        const maestroActionsToken = core.getInput("maestro_actions_token");
         const validFormulas = ["diagnoseOnly", "atomicContention", "memoryAccess", "bankConflict"];
         if (!validFormulas.includes(formula)) {
             core.setFailed(`Invalid formula: ${formula}. Allowed formulas are: ${validFormulas.join(", ")}`);
@@ -30283,12 +30284,11 @@ async function run() {
         }
         // Create PR if requested
         if (createPr) {
-            const token = process.env.MAESTRO_ACTIONS_TOKEN;
-            if (!token) {
-                core.setFailed('MAESTRO_ACTIONS_TOKEN is required for PR creation');
+            if (!maestroActionsToken) {
+                core.setFailed('maestro_actions_token input is required for PR creation');
                 return;
             }
-            await createPullRequest(token, modifiedFiles, lastJsonContent);
+            await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
         }
     }
     catch (err) {
