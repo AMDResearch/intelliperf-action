@@ -349,9 +349,9 @@ async function run() {
 
         // Create PR if requested
         if (createPr) {
-            const token = process.env.GITHUB_TOKEN;
+            const token = process.env.MAESTRO_ACTIONS_TOKEN;
             if (!token) {
-                core.setFailed('GITHUB_TOKEN is required for PR creation');
+                core.setFailed('MAESTRO_ACTIONS_TOKEN is required for PR creation');
                 return;
             }
             await createPullRequest(token, modifiedFiles, lastJsonContent);
