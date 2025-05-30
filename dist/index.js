@@ -30179,7 +30179,7 @@ function formatFormulaName(formula) {
     const formulaInfo = formulaMap[formula] || { name: formula, emoji: '⚡' };
     return `${formulaInfo.emoji} ${formulaInfo.name}`;
 }
-async function createPullRequest(token, modifiedFiles, jsonContent) {
+async function createPullRequest(token, modifiedFiles, jsonContent, globalFormula, app) {
     const octokit = github.getOctokit(token);
     const context = github.context;
     if (modifiedFiles.size === 0) {
@@ -30205,11 +30205,12 @@ async function createPullRequest(token, modifiedFiles, jsonContent) {
     // Push changes
     (0, child_process_1.execSync)(`git push origin ${branchName}`);
     // Format PR title and body
-    const formula = (jsonContent === null || jsonContent === void 0 ? void 0 : jsonContent.formula) || 'unknown';
+    const formula = globalFormula || (app === null || app === void 0 ? void 0 : app.formula) || 'unknown';
     const formattedFormula = formatFormulaName(formula);
     const title = `[Maestro] Optimizing ${formattedFormula}`;
     // Format PR body with emojis and better structure
-    const prBody = [
+    const maxBodyLength = 65000; // Leave some buffer for other content
+    const baseContent = [
         '# 🎻🕺 Maestro 🕺🎼',
         '',
         `${(jsonContent === null || jsonContent === void 0 ? void 0 : jsonContent.bottleneck_report) || 'No analysis report available.'} This PR contains an optimized and validated implementation. See log below for complete output.`,
@@ -30221,12 +30222,29 @@ async function createPullRequest(token, modifiedFiles, jsonContent) {
         '<details>',
         '<summary>Click to expand log output</summary>',
         '',
-        '```json',
-        JSON.stringify(jsonContent, null, 2),
-        '```',
-        '',
-        '</details>'
+        '```json'
     ].join('\n');
+    let jsonString = '';
+    if (jsonContent) {
+        // Calculate remaining space for JSON
+        const remainingSpace = maxBodyLength - baseContent.length - 10; // 10 for closing ``` and newlines
+        jsonString = JSON.stringify(jsonContent, null, 2);
+        if (jsonString.length > remainingSpace) {
+            // Keep only essential fields
+            const essentialContent = {
+                formula: jsonContent.formula,
+                bottleneck_report: jsonContent.bottleneck_report,
+                report_message: jsonContent.report_message,
+                // Add any other essential fields here
+            };
+            jsonString = JSON.stringify(essentialContent, null, 2);
+            // If still too long, truncate
+            if (jsonString.length > remainingSpace) {
+                jsonString = jsonString.substring(0, remainingSpace) + '\n// ... (truncated)';
+            }
+        }
+    }
+    const prBody = `${baseContent}\n${jsonString}\n\`\`\`\n\n</details>`;
     const pr = await octokit.rest.pulls.create({
         owner: context.repo.owner,
         repo: context.repo.repo,
@@ -30357,7 +30375,7 @@ async function run() {
                     core.setFailed('maestro_actions_token input is required for PR creation');
                     return;
                 }
-                await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
+                await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent, globalFormula, app);
             }
             do_cleanup(workspace, defaultDockerImage);
         }
