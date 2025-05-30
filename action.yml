@@ -50,6 +50,9 @@ inputs:
   huggingface_token:
     description: "Huggingface token"
     required: false    
+  llm_gateway_key:
+    description: "LLM Gateway API key for accessing language models"
+    required: false
   create_pr:
     description: "Whether to create a PR with changes"
     required: false
