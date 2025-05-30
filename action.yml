@@ -29,7 +29,7 @@ inputs:
     description: "Maestro Formula"
     required: true
   applications:
-    description: "List of application objects"
+    description: "List of application objects. Each object can have: command (required), output_json (optional), build_script (optional), build_command (optional), instrument_command (optional), project_directory (optional)"
     required: true
   docker_image:
     description: "Default Docker image to use"
@@ -43,6 +43,10 @@ inputs:
   huggingface_token:
     description: "Huggingface token"
     required: false    
+  create_pr:
+    description: "Whether to create a PR with the changes (true/false)"
+    required: false
+    default: "false"
 runs:
   using: "node20"
   main: "dist/index.js"
