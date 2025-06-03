@@ -77,7 +77,7 @@ function deleteOverlay(overlayPath: string) {
 
 function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string): string {
     const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
-    const topNFlag = topN ? `--top_n ${topN}` : '';
+    const topNFlag = topN ? `--top-n ${topN}` : '';
     const buildCommandFlag = app.build_command || globalBuildCommand ? `--build_command "${app.build_command || globalBuildCommand}"` : '';
     const instrumentCommandFlag = app.instrument_command || globalInstrumentCommand ? `--instrument_command "${app.instrument_command || globalInstrumentCommand}"` : '';
     const projectDirFlag = app.project_directory || globalProjectDirectory ? `--project_directory ${app.project_directory || globalProjectDirectory}` : '';
