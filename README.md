@@ -24,7 +24,13 @@ SOFTWARE.
 
 # 🎼 IntelliPerf Action
 
-A GitHub Action wrapper for IntelliPerf.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> [!IMPORTANT]  
+> This project is intended for research purposes only and is provided by AMD Research and Advanced Development team. 
+This is not a product. Use it at your own risk and discretion.
+
+A GitHub Action wrapper for [IntelliPerf](https://github.com/AMDResearch/intelliperf).
 
 ---
 
