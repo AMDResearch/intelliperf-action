@@ -1,7 +1,7 @@
 {
-    "name": "maestro-action",
+    "name": "intelliperf-action",
     "version": "1.0.0",
-    "description": "GitHub Action for Maestro",
+    "description": "GitHub Action for IntelliPerf",
     "main": "dist/index.js",
     "scripts": {
         "build": "ncc build src/main.ts -o dist"

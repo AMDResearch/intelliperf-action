@@ -40,4 +40,4 @@ export INPUT_FORMULA="$FORMULA"
 export INPUT_APPLICATIONS="$APPLICATIONS"
 
 # Execute the Node.js action
-node /github/workspace/.github/actions/maestro-action/dist/index.js
+node /github/workspace/.github/actions/intelliperf-action/dist/index.js

@@ -59,11 +59,11 @@ function formatDate(date: Date): string {
 function createOverlay(): string {
     const user = process.env.USER || 'github';
     const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
-    const overlay = `/tmp/maestro_overlay_${user}_${timestamp}.img`;
+    const overlay = `/tmp/intelliperf_overlay_${user}_${timestamp}.img`;
     const overlaySize = 2048;
 
     core.info(`[Log] Creating overlay: ${overlay}`);
-    execSync(`apptainer overlay create --size ${overlaySize} --create-dir /var/cache/maestro ${overlay}`, { stdio: 'inherit' });
+    execSync(`apptainer overlay create --size ${overlaySize} --create-dir /var/cache/intelliperf ${overlay}`, { stdio: 'inherit' });
 
     return overlay;
 }
@@ -75,7 +75,7 @@ function deleteOverlay(overlayPath: string) {
     }
 }
 
-function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string): string {
+function buildIntelliPerfCommand(app: Application, absOutputJson?: string, topN?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string): string {
     const outputFlag = absOutputJson ? `--output_file ${absOutputJson}` : '';
     const topNFlag = topN ? `--top_n ${topN}` : '';
     const buildCommandFlag = app.build_command || globalBuildCommand ? `--build_command "${app.build_command || globalBuildCommand}"` : '';
@@ -83,7 +83,7 @@ function buildMaestroCommand(app: Application, absOutputJson?: string, topN?: st
     const projectDirFlag = app.project_directory || globalProjectDirectory ? `--project_directory ${app.project_directory || globalProjectDirectory}` : '';
     const formulaFlag = app.formula || globalFormula ? `--formula ${app.formula || globalFormula}` : '';
 
-    return `maestro ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
+    return `intelliperf ${buildCommandFlag} ${instrumentCommandFlag} ${projectDirFlag} -vvv ${outputFlag} ${topNFlag} ${formulaFlag} -- ${app.command}`;
 }
 
 function do_cleanup(workspace: string, dockerImage?: string) {
@@ -127,13 +127,13 @@ function do_cleanup(workspace: string, dockerImage?: string) {
 }
 
 function run_in_apptainer(execDir: string, image: string, app: Application, overlay: string, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
+    let intelliperfCmd = buildIntelliPerfCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
 
     if (huggingfaceToken) {
-        maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
+        intelliperfCmd = `huggingface-cli login --token ${huggingfaceToken} && ${intelliperfCmd}`;
     }
 
-    const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${image} bash --rcfile /etc/bash.bashrc -c "${maestroCmd}"`;
+    const apptainerCmd = `apptainer exec --overlay ${overlay} --cleanenv ${image} bash --rcfile /etc/bash.bashrc -c "${intelliperfCmd}"`;
 
     // Obfuscate the token after "--token"
     let safeApptainerCmd = apptainerCmd;
@@ -149,12 +149,12 @@ function run_in_apptainer(execDir: string, image: string, app: Application, over
 }
 
 function run_in_docker(execDir: string, image: string, app: Application, absOutputJson?: string, topN?: string, huggingfaceToken?: string, globalFormula?: string, globalBuildCommand?: string, globalInstrumentCommand?: string, llmGatewayKey?: string, globalProjectDirectory?: string) {
-    let maestroCmd = buildMaestroCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
+    let intelliperfCmd = buildIntelliPerfCommand(app, absOutputJson, topN, globalFormula, globalBuildCommand, globalInstrumentCommand, llmGatewayKey, globalProjectDirectory);
     const homeDir = process.env.HOME!;
     const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
 
     if (huggingfaceToken) {
-        maestroCmd = `huggingface-cli login --token ${huggingfaceToken} && ${maestroCmd}`;
+        intelliperfCmd = `huggingface-cli login --token ${huggingfaceToken} && ${intelliperfCmd}`;
     }
 
     // For non-diagnoseOnly formulas, use the workspace directory
@@ -170,7 +170,7 @@ function run_in_docker(execDir: string, image: string, app: Application, absOutp
         -w ${workingDir} \
         ${llmGatewayKey ? `-e LLM_GATEWAY_KEY=${llmGatewayKey}` : ''} \
         ${image} \
-        bash -c "${maestroCmd.replace(/"/g, '\\"')}"`;
+        bash -c "${intelliperfCmd.replace(/"/g, '\\"')}"`;
 
     // Obfuscate the token after "--token"
     let safeDockerCmd = dockerCmd;
@@ -243,11 +243,11 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     const context = github.context;
 
     if (modifiedFiles.size === 0) {
-        core.info('No files were modified by Maestro, skipping PR creation');
+        core.info('No files were modified by IntelliPerf, skipping PR creation');
         return;
     }
 
-    const branchName = `maestro-updates-${Date.now()}`;
+    const branchName = `intelliperf-updates-${Date.now()}`;
     const baseBranch = context.ref.replace('refs/heads/', '');
 
     // Create new branch
@@ -266,7 +266,7 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
 
     execSync('git config --global user.email "github-actions[bot]@users.noreply.github.com"');
     execSync('git config --global user.name "github-actions[bot]"');
-    execSync('git commit -m "Update files based on Maestro analysis"');
+    execSync('git commit -m "Update files based on IntelliPerf analysis"');
 
     // Push changes
     execSync(`git push origin ${branchName}`);
@@ -274,12 +274,12 @@ async function createPullRequest(token: string, modifiedFiles: Set<string>, json
     // Format PR title and body
     const formula = jsonContent?.formula || 'unknown';
     const formattedFormula = formatFormulaName(formula);
-    const title = `[Maestro] Optimizing ${formattedFormula}`;
+    const title = `[IntelliPerf] Optimizing ${formattedFormula}`;
 
     // Format PR body with emojis and better structure
     const maxBodyLength = 65000; // Leave some buffer for other content
     const baseContent = [
-        '# 🎻🕺 Maestro 🕺🎼',
+        '# 🎻🕺 IntelliPerf 🕺🎼',
         '',
         `${jsonContent?.bottleneck_report || 'No analysis report available.'} This PR contains an optimized and validated implementation. See log below for complete output.`,
         '',
@@ -342,7 +342,7 @@ async function run() {
         const defaultApptainerImage = core.getInput("apptainer_image");
         const huggingfaceToken = core.getInput("huggingface_token");
         const createPr = core.getInput("create_pr") === "true";
-        const maestroActionsToken = core.getInput("maestro_actions_token");
+        const intelliperfActionsToken = core.getInput("intelliperf_actions_token");
 
         const validFormulas = ["diagnoseOnly", "atomicContention", "memoryAccess", "bankConflict"];
 
@@ -385,7 +385,7 @@ async function run() {
 
         const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
         const parentDir = path.resolve(workspace, '..');
-        const execDir = path.join(parentDir, `maestro_exec_${repoName}_${dateStr}_${jobId}`);
+        const execDir = path.join(parentDir, `intelliperf_exec_${repoName}_${dateStr}_${jobId}`);
 
         if (!fs.existsSync(execDir)) {
             fs.mkdirSync(execDir, { recursive: true });
@@ -449,11 +449,11 @@ async function run() {
 
             // Create PR if requested
             if (createPr) {
-                if (!maestroActionsToken) {
-                    core.setFailed('maestro_actions_token input is required for PR creation');
+                if (!intelliperfActionsToken) {
+                    core.setFailed('intelliperf_actions_token input is required for PR creation');
                     return;
                 }
-                await createPullRequest(maestroActionsToken, modifiedFiles, lastJsonContent);
+                await createPullRequest(intelliperfActionsToken, modifiedFiles, lastJsonContent);
             }
 
             do_cleanup(workspace, defaultDockerImage);

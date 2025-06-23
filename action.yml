@@ -22,11 +22,11 @@
 # SOFTWARE.
 ################################################################################
 
-name: "Maestro Action"
-description: "A GitHub Action wrapper for Maestro"
+name: "IntelliPerf Action"
+description: "A GitHub Action wrapper for IntelliPerf"
 inputs:
   formula:
-    description: "Global Maestro formula to use for all applications (can be overridden per application)"
+    description: "Global IntelliPerf formula to use for all applications (can be overridden per application)"
     required: false
   build_command:
     description: "Global build command to use for all applications (can be overridden per application)"
@@ -60,7 +60,7 @@ inputs:
     description: "Whether to create a PR with changes"
     required: false
     default: "false"
-  maestro_actions_token:
+  intelliperf_actions_token:
     description: "GitHub token for PR creation (required if create_pr is true)"
     required: false    
 runs:

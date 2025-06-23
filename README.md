@@ -22,15 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 -->
 
-# 🎼 Maestro Action
+# 🎼 IntelliPerf Action
 
-A GitHub Action wrapper for Maestro.
+A GitHub Action wrapper for IntelliPerf.
 
 ---
 
 ## ✨ Features
 
-- Supports multiple Maestro formulas:
+- Supports multiple IntelliPerf formulas:
   - `atomicContention`: Analyzes atomic operation contention
   - `memoryAccess`: Analyzes memory access patterns
   - `bankConflict`: Analyzes bank conflicts
@@ -49,29 +49,29 @@ name: Example Workflow
 on: [push]
 
 jobs:
-  run-maestro:
+  run-intelliperf:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout main repo
         uses: actions/checkout@v3
 
-      - name: Checkout maestro-action
+      - name: Checkout intelliperf-action
         uses: actions/checkout@v3
         with:
-          repository: AARInternal/maestro-action
-          token: ${{ secrets.MAESTRO_ACTIONS_TOKEN }}
-          path: .github/actions/maestro-action
+          repository: AARInternal/intelliperf-action
+          token: ${{ secrets.INTELLIPERF_ACTIONS_TOKEN }}
+          path: .github/actions/intelliperf-action
 
-      - name: Run Maestro Action
-        uses: ./.github/actions/maestro-action
+      - name: Run IntelliPerf Action
+        uses: ./.github/actions/intelliperf-action
         with:
           formula: "atomicContention"  # One of: atomicContention, memoryAccess, bankConflict, diagnoseOnly
           docker_image: "my-default-docker:latest"         # Optional if using Docker
           apptainer_image: "/path/to/default_apptainer.sif" # Optional if using Apptainer
           top_n: "10"                                       # Optional, defaults to 10
           create_pr: "true"                                # Optional, creates PR with changes
-          maestro_actions_token: ${{ secrets.MAESTRO_ACTIONS_TOKEN }}  # Required if create_pr is true
+          intelliperf_actions_token: ${{ secrets.INTELLIPERF_ACTIONS_TOKEN }}  # Required if create_pr is true
           applications: >-
             [
               { 
@@ -132,14 +132,14 @@ applications: >-
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `formula` | Maestro formula to use. One of: atomicContention, memoryAccess, bankConflict, diagnoseOnly | Yes | - |
+| `formula` | IntelliPerf formula to use. One of: atomicContention, memoryAccess, bankConflict, diagnoseOnly | Yes | - |
 | `applications` | List of application objects | Yes | - |
 | `docker_image` | Default Docker image to use | No | - |
 | `apptainer_image` | Default Apptainer image to use | No | - |
 | `top_n` | Top N kernels to report | No | 10 |
 | `huggingface_token` | Huggingface token | No | - |
 | `create_pr` | Whether to create a PR with changes | No | false |
-| `maestro_actions_token` | GitHub token for PR creation (required if create_pr is true) | No | - |
+| `intelliperf_actions_token` | GitHub token for PR creation (required if create_pr is true) | No | - |
 
 ### Application Object
 
